@@ -34,10 +34,20 @@ rsync -a --delete --prune-empty-dirs \
 rm -rf "$TODAY"
 cp -al "$LATEST" "$TODAY" 2>>"$LOG" || cp -a "$LATEST" "$TODAY" >> "$LOG" 2>&1
 
-# Prune snapshots beyond the most recent $KEEP.
+# Prune snapshots beyond the most recent $KEEP. On cloud-synced folders,
+# rm -rf can race with the sync daemon holding a file handle and leave an
+# empty directory behind, so retry once and verify before declaring success.
 find "$SNAPSHOTS" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((KEEP + 1)) | while read -r old; do
   rm -rf "$old"
-  echo "$(date '+%Y-%m-%d %H:%M:%S') pruned $old" >> "$LOG"
+  if [ -d "$old" ]; then
+    sleep 2
+    rm -rf "$old"
+  fi
+  if [ -d "$old" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') WARNING: failed to fully remove $old (will retry next run)" >> "$LOG"
+  else
+    echo "$(date '+%Y-%m-%d %H:%M:%S') pruned $old" >> "$LOG"
+  fi
 done
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') backup complete" >> "$LOG"
