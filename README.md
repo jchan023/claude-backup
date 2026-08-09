@@ -30,6 +30,16 @@ Since the tokens file contains auth/session credentials, only use this if
 you're comfortable with that material living in your backup destination
 (e.g. your own private Dropbox).
 
+## Contents
+
+- [Install](#install)
+- [Backing up somewhere other than Dropbox](#backing-up-somewhere-other-than-dropbox)
+- [Snapshot pruning](#snapshot-pruning)
+- [Usage examples](#usage-examples)
+- [Restore](#restore)
+- [Uninstall](#uninstall)
+- [Logs](#logs)
+
 ## Install
 
 ```bash
