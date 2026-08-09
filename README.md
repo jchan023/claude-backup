@@ -43,6 +43,7 @@ your own private cloud storage).
 - [Uninstall](#uninstall)
 - [Logs](#logs)
 - [Failure alerts](#failure-alerts)
+- [Changelog](CHANGELOG.md)
 
 ## Install
 
