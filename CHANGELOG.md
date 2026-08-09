@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-09
+
+### Fixed
+
+- `~/Library/Logs` is no longer assumed to exist — `install.sh` and
+  `claude-desktop-backup.sh` now `mkdir -p` it before writing the log.
+  On a genuinely fresh `$HOME` with no pre-existing `Logs` directory
+  (verified by testing the README's install instructions against a
+  clean clone), the very first log write failed and aborted the backup.
+
 ## [1.0.0] - 2026-08-09
 
 Initial release.
@@ -49,5 +59,6 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/jchan023/claude-backup/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/jchan023/claude-backup/releases/tag/v1.0.0
