@@ -22,11 +22,9 @@ these regenerate automatically and just waste space (Claude Desktop's data
 directory is a Chromium/Electron profile, so most of its multi-GB footprint
 is disposable cache).
 
-Keeps a `latest/` mirror plus a small number of dated snapshots
-(`snapshots/YYYY-MM-DD/`, default 3) so you can recover from an accidental
-overwrite, not just the most recent state. Snapshots are hardlinked against
-`latest/`, so they cost near-zero extra disk space unless a file actually
-changed day to day.
+Keeps a `latest/` mirror plus a small number of dated snapshots so you can
+recover from an accidental overwrite, not just the most recent state — see
+[Snapshot pruning](#snapshot-pruning) for how that works.
 
 Since the tokens file contains auth/session credentials, only use this if
 you're comfortable with that material living in your backup destination
@@ -87,6 +85,41 @@ exported in your shell — launchd doesn't inherit your terminal's
 environment, so `install.sh` bakes it into the launchd job's
 `EnvironmentVariables` at install time. To change the destination later,
 just re-run `install.sh` with the new value.
+
+## Snapshot pruning
+
+Every run does two things after syncing `latest/`:
+
+1. Copies `latest/` into a dated snapshot, `snapshots/YYYY-MM-DD/`. If the
+   script runs more than once on the same day, that day's snapshot is just
+   overwritten — you get one snapshot per calendar day, not per run.
+2. Deletes snapshots beyond the newest `CLAUDE_BACKUP_KEEP` (default `3`),
+   picking the newest by sorting directory names — which works because
+   `YYYY-MM-DD` sorts chronologically as plain text.
+
+Snapshots are created with hardlinks (`cp -al`) against `latest/` rather
+than full copies, so keeping N days of history costs close to zero extra
+disk space — each snapshot only takes real space for files that changed
+since the previous one. On filesystems that don't support hardlinks (e.g.
+Google Drive Stream — see above), it falls back to a full copy per
+snapshot instead.
+
+Because the destination is typically a cloud-sync folder, deleting a
+snapshot directory can race with the sync daemon (Dropbox, Google Drive,
+etc.) holding a file handle open, which can leave an empty
+directory behind instead of fully removing it. The script retries the
+delete once after a short pause and verifies the directory is actually
+gone; if it still can't remove it, it logs a `WARNING` line instead of
+falsely claiming success, and cleans it up on the next run. Check
+`~/Library/Logs/claude-desktop-backup.log` if `snapshots/` ever seems to
+hold more than `CLAUDE_BACKUP_KEEP` entries.
+
+To change how many snapshots are kept, re-run `install.sh` with a new
+`CLAUDE_BACKUP_KEEP`:
+
+```bash
+CLAUDE_BACKUP_KEEP=7 ./install.sh
+```
 
 ## Usage examples
 
