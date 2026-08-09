@@ -35,7 +35,7 @@ rm -rf "$TODAY"
 cp -al "$LATEST" "$TODAY" 2>>"$LOG" || cp -a "$LATEST" "$TODAY" >> "$LOG" 2>&1
 
 # Prune snapshots beyond the most recent $KEEP.
-ls -1d "$SNAPSHOTS"/*/ 2>/dev/null | sort -r | tail -n +$((KEEP + 1)) | while read -r old; do
+find "$SNAPSHOTS" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((KEEP + 1)) | while read -r old; do
   rm -rf "$old"
   echo "$(date '+%Y-%m-%d %H:%M:%S') pruned $old" >> "$LOG"
 done
