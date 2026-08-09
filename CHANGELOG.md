@@ -2,11 +2,14 @@
 
 All notable changes to this project are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-No versioned releases have been tagged yet — everything so far is under
-[Unreleased].
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-08-09
+
+Initial release.
 
 ### Added
 
@@ -27,9 +30,9 @@ No versioned releases have been tagged yet — everything so far is under
 ### Changed
 
 - Generalized backup-location terminology throughout — no longer assumes
-  Dropbox specifically; the default `CLAUDE_BACKUP_DEST` is now
-  `~/Backups/ClaudeDesktop`, with cloud sync (Dropbox, Google Drive,
-  OneDrive, iCloud Drive, etc.) achieved by pointing it at whichever
+  any specific provider; the default `CLAUDE_BACKUP_DEST` is now
+  `~/Backups/ClaudeDesktop`, with cloud sync (Google Drive, OneDrive,
+  iCloud Drive, or similar) achieved by pointing it at whichever
   provider's synced folder you prefer.
 - Bumped `actions/checkout` to v5 to resolve a Node 20 deprecation warning
   in CI.
@@ -41,7 +44,10 @@ No versioned releases have been tagged yet — everything so far is under
   only read at install time and silently lost at run time, since launchd
   doesn't inherit the installing shell's environment.
 - Snapshot pruning now retries and verifies deletion instead of blindly
-  logging success — cloud-sync daemons (Dropbox, Google Drive, etc.) can
-  race with `rm -rf` and leave an empty directory behind.
+  logging success — cloud-sync daemons can race with `rm -rf` and leave
+  an empty directory behind.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
+
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/jchan023/claude-backup/releases/tag/v1.0.0
