@@ -9,6 +9,11 @@ PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 LOG="$HOME/Library/Logs/claude-desktop-backup.log"
 HOUR="${CLAUDE_BACKUP_HOUR:-9}"
 MINUTE="${CLAUDE_BACKUP_MINUTE:-0}"
+# Defaulted here (not just in the script) because launchd does not inherit
+# your shell's environment — anything the script should see at run time
+# must be baked into the plist's EnvironmentVariables block below.
+DEST="${CLAUDE_BACKUP_DEST:-$HOME/Dropbox/Backups/ClaudeDesktop}"
+KEEP="${CLAUDE_BACKUP_KEEP:-3}"
 
 mkdir -p "$HOME/Library/Scripts" "$HOME/Library/LaunchAgents"
 cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$DEST_SCRIPT"
@@ -26,6 +31,13 @@ cat > "$PLIST_PATH" <<PLIST
         <string>/bin/bash</string>
         <string>$DEST_SCRIPT</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CLAUDE_BACKUP_DEST</key>
+        <string>$DEST</string>
+        <key>CLAUDE_BACKUP_KEEP</key>
+        <string>$KEEP</string>
+    </dict>
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
@@ -48,5 +60,5 @@ launchctl load "$PLIST_PATH"
 
 echo "Installed $DEST_SCRIPT"
 echo "Loaded launchd job '$PLIST_LABEL' (runs daily at $HOUR:$(printf '%02d' "$MINUTE"))"
-echo "Backups go to: \${CLAUDE_BACKUP_DEST:-\$HOME/Dropbox/Backups/ClaudeDesktop}"
+echo "Backups go to: $DEST (keeping $KEEP snapshots)"
 echo "Logs: $LOG"

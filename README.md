@@ -1,5 +1,7 @@
 # claude-backup
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Daily backup of Claude Desktop's config, auth tokens, and session history
 (macOS) to Dropbox or any other target directory, using `launchd`.
 
@@ -54,6 +56,36 @@ CLAUDE_BACKUP_MINUTE=0 \
   script itself, not just the installer)
 - `CLAUDE_BACKUP_KEEP` — number of dated snapshots to retain
 - `CLAUDE_BACKUP_HOUR` / `CLAUDE_BACKUP_MINUTE` — daily run time (24h)
+
+## Backing up somewhere other than Dropbox
+
+Point `CLAUDE_BACKUP_DEST` at any locally-synced folder — Google Drive,
+OneDrive, iCloud Drive, an external drive, etc. — and it just works, no
+code changes needed:
+
+```bash
+CLAUDE_BACKUP_DEST="$HOME/Library/CloudStorage/GoogleDrive-you@gmail.com/My Drive/Backups/ClaudeDesktop" \
+./install.sh
+```
+
+Two things to know:
+
+- **This backs up to a local path that some other process syncs to the
+  cloud** (Dropbox/Google Drive/OneDrive's desktop app), not directly to a
+  cloud API. If you use Google Drive in "Stream" mode, its mount point is
+  usually under `~/Library/CloudStorage/GoogleDrive-<account>/My Drive`.
+- **Hardlinked snapshots need a real filesystem.** Some cloud-sync mounts
+  (notably Google Drive Stream, and some network mounts) don't support
+  hardlinks. The script already handles this — `cp -al` (hardlink) is
+  tried first and falls back to a full `cp -a` copy automatically — but on
+  those destinations each snapshot uses real extra disk space instead of
+  being nearly free.
+
+`CLAUDE_BACKUP_DEST` must be set when you run `install.sh`, not just
+exported in your shell — launchd doesn't inherit your terminal's
+environment, so `install.sh` bakes it into the launchd job's
+`EnvironmentVariables` at install time. To change the destination later,
+just re-run `install.sh` with the new value.
 
 ## Restore
 
