@@ -1,11 +1,12 @@
 #!/bin/bash
 # Backs up Claude Desktop's config, auth tokens, and session history to
-# Dropbox (or any other target directory), keeping a small number of
-# rotating dated snapshots. See README.md for setup via install.sh.
+# your chosen backup location (a cloud-synced folder or any other target
+# directory), keeping a small number of rotating dated snapshots.
+# See README.md for setup via install.sh.
 set -euo pipefail
 
 SRC="$HOME/Library/Application Support/Claude"
-ROOT="${CLAUDE_BACKUP_DEST:-$HOME/Dropbox/Backups/ClaudeDesktop}"
+ROOT="${CLAUDE_BACKUP_DEST:-$HOME/Backups/ClaudeDesktop}"
 LATEST="$ROOT/latest"
 SNAPSHOTS="$ROOT/snapshots"
 TODAY="$SNAPSHOTS/$(date '+%Y-%m-%d')"

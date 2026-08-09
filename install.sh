@@ -12,7 +12,7 @@ MINUTE="${CLAUDE_BACKUP_MINUTE:-0}"
 # Defaulted here (not just in the script) because launchd does not inherit
 # your shell's environment — anything the script should see at run time
 # must be baked into the plist's EnvironmentVariables block below.
-DEST="${CLAUDE_BACKUP_DEST:-$HOME/Dropbox/Backups/ClaudeDesktop}"
+DEST="${CLAUDE_BACKUP_DEST:-$HOME/Backups/ClaudeDesktop}"
 KEEP="${CLAUDE_BACKUP_KEEP:-3}"
 
 mkdir -p "$HOME/Library/Scripts" "$HOME/Library/LaunchAgents"
