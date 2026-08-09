@@ -12,6 +12,7 @@ SNAPSHOTS="$ROOT/snapshots"
 TODAY="$SNAPSHOTS/$(date '+%Y-%m-%d')"
 LOG="$HOME/Library/Logs/claude-desktop-backup.log"
 KEEP="${CLAUDE_BACKUP_KEEP:-3}"
+MAX_LOG_LINES="${CLAUDE_BACKUP_LOG_MAX_LINES:-2000}"
 
 mkdir -p "$LATEST" "$SNAPSHOTS"
 
@@ -52,3 +53,9 @@ find "$SNAPSHOTS" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((KEEP +
 done
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') backup complete" >> "$LOG"
+
+# Trim the log to the most recent $MAX_LOG_LINES lines so it doesn't grow
+# unbounded.
+if [ "$(wc -l < "$LOG")" -gt "$MAX_LOG_LINES" ]; then
+  tail -n "$MAX_LOG_LINES" "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+fi

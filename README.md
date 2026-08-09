@@ -180,3 +180,13 @@ left untouched.
 ## Logs
 
 `~/Library/Logs/claude-desktop-backup.log`
+
+Trimmed to the most recent `CLAUDE_BACKUP_LOG_MAX_LINES` lines (default
+`2000`, roughly years of daily runs since each run only logs a few lines)
+after every run, so it doesn't grow unbounded. Nothing currently reads
+this log or alerts you on failure — check it manually, or grep for
+`WARNING` to catch snapshot-pruning issues:
+
+```bash
+grep WARNING ~/Library/Logs/claude-desktop-backup.log
+```
