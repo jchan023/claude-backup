@@ -88,6 +88,34 @@ environment, so `install.sh` bakes it into the launchd job's
 `EnvironmentVariables` at install time. To change the destination later,
 just re-run `install.sh` with the new value.
 
+## Usage examples
+
+Run a backup manually (useful right after install, or to test a config
+change) instead of waiting for the next scheduled run:
+
+```bash
+~/Library/Scripts/claude-desktop-backup.sh
+```
+
+Tail the log to confirm it's running and see what got pruned:
+
+```bash
+tail -f ~/Library/Logs/claude-desktop-backup.log
+```
+
+List available snapshots to restore from:
+
+```bash
+ls ~/Dropbox/Backups/ClaudeDesktop/snapshots
+```
+
+Change the schedule to 6:30 PM and keep 7 days of history instead of the
+defaults:
+
+```bash
+CLAUDE_BACKUP_HOUR=18 CLAUDE_BACKUP_MINUTE=30 CLAUDE_BACKUP_KEEP=7 ./install.sh
+```
+
 ## Restore
 
 1. Install Claude Desktop and quit it.
