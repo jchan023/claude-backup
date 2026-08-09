@@ -23,7 +23,7 @@ notify() {
 
 trap 'notify "Claude Desktop Backup Failed" "Script exited with an error — check ~/Library/Logs/claude-desktop-backup.log"' ERR
 
-mkdir -p "$LATEST" "$SNAPSHOTS"
+mkdir -p "$LATEST" "$SNAPSHOTS" "$(dirname "$LOG")"
 
 rsync -a --delete --prune-empty-dirs \
   --include="claude_desktop_config.json" \
