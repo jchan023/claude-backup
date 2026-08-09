@@ -15,6 +15,7 @@ MINUTE="${CLAUDE_BACKUP_MINUTE:-0}"
 DEST="${CLAUDE_BACKUP_DEST:-$HOME/Backups/ClaudeDesktop}"
 KEEP="${CLAUDE_BACKUP_KEEP:-3}"
 MAX_LOG_LINES="${CLAUDE_BACKUP_LOG_MAX_LINES:-2000}"
+NOTIFY="${CLAUDE_BACKUP_NOTIFY:-1}"
 
 mkdir -p "$HOME/Library/Scripts" "$HOME/Library/LaunchAgents"
 cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$DEST_SCRIPT"
@@ -40,6 +41,8 @@ cat > "$PLIST_PATH" <<PLIST
         <string>$KEEP</string>
         <key>CLAUDE_BACKUP_LOG_MAX_LINES</key>
         <string>$MAX_LOG_LINES</string>
+        <key>CLAUDE_BACKUP_NOTIFY</key>
+        <string>$NOTIFY</string>
     </dict>
     <key>StartCalendarInterval</key>
     <dict>

@@ -42,6 +42,7 @@ your own private cloud storage).
 - [Restore](#restore)
 - [Uninstall](#uninstall)
 - [Logs](#logs)
+- [Failure alerts](#failure-alerts)
 
 ## Install
 
@@ -183,10 +184,30 @@ left untouched.
 
 Trimmed to the most recent `CLAUDE_BACKUP_LOG_MAX_LINES` lines (default
 `2000`, roughly years of daily runs since each run only logs a few lines)
-after every run, so it doesn't grow unbounded. Nothing currently reads
-this log or alerts you on failure — check it manually, or grep for
-`WARNING` to catch snapshot-pruning issues:
+after every run, so it doesn't grow unbounded. You can also grep it
+directly for `WARNING` entries (non-fatal snapshot-pruning issues):
 
 ```bash
 grep WARNING ~/Library/Logs/claude-desktop-backup.log
 ```
+
+## Failure alerts
+
+A macOS notification (via `osascript`) fires when:
+
+- the script exits with an error (e.g. `rsync` fails) — "Claude Desktop
+  Backup Failed"
+- a snapshot can't be fully removed during pruning — "Claude Desktop
+  Backup Warning" (see [Snapshot pruning](#snapshot-pruning))
+
+Disable notifications with `CLAUDE_BACKUP_NOTIFY=0` (same caveat as the
+other settings — set it when running `install.sh`, not just in your
+shell, since launchd doesn't inherit your terminal's environment):
+
+```bash
+CLAUDE_BACKUP_NOTIFY=0 ./install.sh
+```
+
+Notifications appear from "Script Editor" in Notification Center — if
+they don't show up, check System Settings → Notifications → Script
+Editor.

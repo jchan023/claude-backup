@@ -13,6 +13,15 @@ TODAY="$SNAPSHOTS/$(date '+%Y-%m-%d')"
 LOG="$HOME/Library/Logs/claude-desktop-backup.log"
 KEEP="${CLAUDE_BACKUP_KEEP:-3}"
 MAX_LOG_LINES="${CLAUDE_BACKUP_LOG_MAX_LINES:-2000}"
+NOTIFY="${CLAUDE_BACKUP_NOTIFY:-1}"
+
+notify() {
+  local title="$1" message="$2"
+  [ "$NOTIFY" = "1" ] || return 0
+  /usr/bin/osascript -e "display notification \"$message\" with title \"$title\"" >/dev/null 2>&1 || true
+}
+
+trap 'notify "Claude Desktop Backup Failed" "Script exited with an error — check ~/Library/Logs/claude-desktop-backup.log"' ERR
 
 mkdir -p "$LATEST" "$SNAPSHOTS"
 
@@ -47,6 +56,7 @@ find "$SNAPSHOTS" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((KEEP +
   fi
   if [ -d "$old" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') WARNING: failed to fully remove $old (will retry next run)" >> "$LOG"
+    notify "Claude Desktop Backup Warning" "Could not fully remove old snapshot $(basename "$old") — check the log."
   else
     echo "$(date '+%Y-%m-%d %H:%M:%S') pruned $old" >> "$LOG"
   fi
