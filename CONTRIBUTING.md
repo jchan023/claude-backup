@@ -10,7 +10,8 @@ relevant lines from `~/Library/Logs/claude-desktop-backup.log`.
 ## Making changes
 
 1. Fork and clone the repo.
-2. Edit `claude-desktop-backup.sh`, `install.sh`, or `uninstall.sh`.
+2. Edit `claude-desktop-backup.sh`, `install.sh`, `uninstall.sh`, or
+   `restore.sh`.
 3. Run [ShellCheck](https://www.shellcheck.net/) locally before opening a
    PR — CI runs it on every push/PR and will fail on warnings:
    ```bash
@@ -23,9 +24,19 @@ relevant lines from `~/Library/Logs/claude-desktop-backup.log`.
    ```bash
    FAKE_HOME=$(mktemp -d)
    HOME="$FAKE_HOME" ./install.sh
+   HOME="$FAKE_HOME" "$FAKE_HOME/Library/Scripts/claude-desktop-backup.sh"
+   HOME="$FAKE_HOME" ./restore.sh -y
    HOME="$FAKE_HOME" ./uninstall.sh
    rm -rf "$FAKE_HOME"
    ```
+   Run scripts under `/bin/bash` explicitly at least once, not just
+   whatever `bash` resolves to in your shell — macOS ships bash 3.2 by
+   default (Apple hasn't updated it since bash went GPLv3), which has
+   real behavioral differences from a newer Homebrew bash (e.g. an empty
+   array expanded with `"${ARR[@]}"` under `set -u` throws "unbound
+   variable" in 3.2 but not in 4+). A change that passes `shellcheck` and
+   works under your interactive shell can still break under the actual
+   interpreter launchd and `install.sh` invoke.
 5. Open a PR describing what changed and why.
 
 ## Scope

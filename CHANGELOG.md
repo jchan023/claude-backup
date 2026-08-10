@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-10
+
+### Added
+
+- `restore.sh` — automates what the README's Restore section previously
+  described as manual `cp` commands. Restores from `latest/` by default
+  or a specific `snapshots/YYYY-MM-DD/` (`./restore.sh 2026-08-09`),
+  supports `--list` to see available dates, prompts for confirmation
+  before overwriting `~/Library/Application Support/Claude/` and
+  `~/.claude/` (skippable with `-y`/`--yes` for scripting), and refuses
+  to run unattended without `-y` when there's no interactive terminal.
+  The manual copy steps are kept in the README as a documented
+  alternative for anyone who'd rather not run a script over freshly
+  restored data.
+- Verified end-to-end (both `latest/` and a dated snapshot, both
+  credentials-included and credentials-excluded backups, the
+  missing-backup and non-interactive guards) before release.
+
 ## [1.2.0] - 2026-08-10
 
 ### Added
@@ -143,7 +161,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/jchan023/claude-backup/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/jchan023/claude-backup/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/jchan023/claude-backup/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/jchan023/claude-backup/compare/v1.1.0...v1.1.1

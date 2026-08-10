@@ -1,6 +1,6 @@
 # claude-backup
 
-[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.2.0)
+[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.3.0)
 [![ShellCheck](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assets License: MIT](https://img.shields.io/badge/Assets-MIT-blue.svg)](LICENSE)
@@ -257,12 +257,41 @@ CLAUDE_BACKUP_HOUR=18 CLAUDE_BACKUP_MINUTE=30 CLAUDE_BACKUP_KEEP=7 ./install.sh
 ## Restore
 
 1. Install Claude Desktop and the Claude Code CLI, and quit/exit both.
-2. Copy files from your backup's `latest/desktop/` (or a specific
-   `snapshots/YYYY-MM-DD/desktop/`) into
-   `~/Library/Application Support/Claude/`.
-3. Copy files from `latest/cli/` (or the matching `snapshots/.../cli/`)
-   into `~/.claude/`.
-4. Relaunch Claude Desktop / the CLI.
+2. Clone the repo (if you're on a rebuilt machine, it won't be there
+   yet) and run `restore.sh`:
+
+```bash
+git clone https://github.com/jchan023/claude-backup.git
+cd claude-backup
+./restore.sh
+```
+
+This restores from `latest/` by default, prompts for confirmation
+(since it overwrites whatever's currently in
+`~/Library/Application Support/Claude/` and `~/.claude/`), and tells you
+what it did. If `CLAUDE_BACKUP_DEST` isn't the default
+(`~/Backups/ClaudeDesktop`), set it the same way you did for `install.sh`:
+
+```bash
+CLAUDE_BACKUP_DEST="$HOME/Backups/ClaudeDesktop" ./restore.sh
+```
+
+To restore from a specific day instead of the latest backup:
+
+```bash
+./restore.sh --list          # see available dates
+./restore.sh 2026-08-09      # restore from snapshots/2026-08-09/
+```
+
+Add `-y`/`--yes` to skip the confirmation prompt (e.g. for scripting).
+
+3. Relaunch Claude Desktop / the CLI.
+
+**Manual alternative**, if you'd rather not run a script over your restored
+data: copy files from `latest/desktop/` (or a specific
+`snapshots/YYYY-MM-DD/desktop/`) into
+`~/Library/Application Support/Claude/`, and from `latest/cli/` (or the
+matching `snapshots/.../cli/`) into `~/.claude/`.
 
 ## Uninstall
 
