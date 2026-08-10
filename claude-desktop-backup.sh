@@ -18,6 +18,7 @@ LOG="$HOME/Library/Logs/claude-desktop-backup.log"
 KEEP="${CLAUDE_BACKUP_KEEP:-3}"
 MAX_LOG_LINES="${CLAUDE_BACKUP_LOG_MAX_LINES:-2000}"
 NOTIFY="${CLAUDE_BACKUP_NOTIFY:-1}"
+INCLUDE_CREDENTIALS="${CLAUDE_BACKUP_INCLUDE_CREDENTIALS:-1}"
 
 notify() {
   local title="$1" message="$2"
@@ -37,18 +38,21 @@ trap 'notify "Claude Backup Failed" "Script exited with an error — check ~/Lib
 
 mkdir -p "$DESKTOP_LATEST" "$CLI_LATEST" "$SNAPSHOTS" "$(dirname "$LOG")"
 
+# claude_desktop_config.json, buddy-tokens.json, and config.json hold
+# Desktop's auth/session credentials; mcp.json can hold API keys for MCP
+# servers. CLAUDE_BACKUP_INCLUDE_CREDENTIALS=0 skips all of them — see
+# README.md's Security section.
+DESKTOP_INCLUDES=(--include="window-state.json" --include="git-worktrees.json" \
+  --include="plan-usage-history.json" --include="cowork-enabled-cli-ops.json" \
+  --include="claude-code-sessions/***" --include="local-agent-mode-sessions/***" \
+  --include="*/" --exclude="*")
+if [ "$INCLUDE_CREDENTIALS" = "1" ]; then
+  DESKTOP_INCLUDES=(--include="claude_desktop_config.json" --include="config.json" \
+    --include="buddy-tokens.json" "${DESKTOP_INCLUDES[@]}")
+fi
+
 rsync -a --delete --prune-empty-dirs \
-  --include="claude_desktop_config.json" \
-  --include="config.json" \
-  --include="buddy-tokens.json" \
-  --include="window-state.json" \
-  --include="git-worktrees.json" \
-  --include="plan-usage-history.json" \
-  --include="cowork-enabled-cli-ops.json" \
-  --include="claude-code-sessions/***" \
-  --include="local-agent-mode-sessions/***" \
-  --include="*/" \
-  --exclude="*" \
+  "${DESKTOP_INCLUDES[@]}" \
   "$DESKTOP_SRC/" "$DESKTOP_LATEST/" >> "$LOG" 2>&1
 
 # ~/.claude is the Claude Code CLI's own state (MCP config, plugins,
@@ -56,7 +60,17 @@ rsync -a --delete --prune-empty-dirs \
 # projects/**/memory/) — small enough (tens of MB, not GBs) to mirror
 # wholesale rather than allowlisting individual files like above.
 if [ -d "$CLI_SRC" ]; then
+  # A plain (unquoted, word-split) string rather than an array: macOS's
+  # default /bin/bash is 3.2, where an *empty* array expanded with
+  # "${ARR[@]}" under `set -u` throws "unbound variable" — this is the
+  # credentials-included default, so it needs to actually work.
+  CLI_EXCLUDES=""
+  if [ "$INCLUDE_CREDENTIALS" != "1" ]; then
+    CLI_EXCLUDES="--exclude=mcp.json --exclude=.credentials.json --exclude=credentials.json"
+  fi
+  # shellcheck disable=SC2086 # intentional word-splitting of a fixed, space-free flag list
   rsync -a --delete --prune-empty-dirs \
+    $CLI_EXCLUDES \
     "$CLI_SRC/" "$CLI_LATEST/" >> "$LOG" 2>&1
 fi
 

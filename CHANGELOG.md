@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-10
+
+### Added
+
+- `CLAUDE_BACKUP_INCLUDE_CREDENTIALS` (default `1`) — set to `0` to skip
+  all credential-bearing files entirely: `buddy-tokens.json`,
+  `config.json`, `claude_desktop_config.json` (Desktop), and `mcp.json`
+  (CLI). Settable at install time or changed later by re-running
+  `install.sh`, same as the other options. Trade-off: after a restore
+  you'll need to re-authenticate and re-enter MCP credentials by hand.
+- README **Security** section: the backup is only as secure as the
+  backup location's own account security (no encryption — it copies
+  files as-is); cloud version history can outlive local cleanup after
+  rotating a leaked token; a table of exactly which files are
+  credential-bearing and why.
+
+### Fixed
+
+- The initial implementation of `CLAUDE_BACKUP_INCLUDE_CREDENTIALS`
+  used a bash array (`CLI_EXCLUDES=()`) that's empty by default. macOS's
+  default `/bin/bash` is 3.2 (Apple hasn't shipped a newer one since
+  bash moved to GPLv3), where expanding an *empty* array with
+  `"${ARR[@]}"` under `set -u` throws "unbound variable" — which is
+  exactly the default, credentials-included case. Caught by testing
+  explicitly under `/bin/bash` rather than a newer bash from Homebrew.
+  Fixed by using a plain word-split string for that one variable instead
+  of an array.
+
 ## [1.1.2] - 2026-08-10
 
 ### Security
@@ -115,7 +143,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/jchan023/claude-backup/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/jchan023/claude-backup/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/jchan023/claude-backup/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/jchan023/claude-backup/compare/v1.0.1...v1.1.0

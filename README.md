@@ -1,6 +1,6 @@
 # claude-backup
 
-[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.1.2)
+[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.2.0)
 [![ShellCheck](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assets License: MIT](https://img.shields.io/badge/Assets-MIT-blue.svg)](LICENSE)
@@ -18,7 +18,7 @@ respectively:
 
 - `claude_desktop_config.json`, `config.json`, `buddy-tokens.json` — app
   config and auth/session tokens (lets you skip re-logging-in after a
-  restore)
+  restore; optional, see [Security](#security))
 - `window-state.json`, `git-worktrees.json`, `plan-usage-history.json`,
   `cowork-enabled-cli-ops.json` — settings
 - `claude-code-sessions/`, `local-agent-mode-sessions/` — conversation and
@@ -44,7 +44,8 @@ include rather than gamble on it.
 since it's small (tens of MB, not GBs):
 
 - `settings.json` — CLI settings
-- `mcp.json` — your MCP server definitions
+- `mcp.json` — your MCP server definitions (can contain API keys;
+  optional, see [Security](#security))
 - `plugins/installed_plugins.json`, `plugins/known_marketplaces.json` —
   installed plugins and marketplaces
 - `projects/` — Claude Code session transcripts **and your memory system**
@@ -54,14 +55,15 @@ Keeps a `latest/` mirror plus a small number of dated snapshots so you can
 recover from an accidental overwrite, not just the most recent state — see
 [Snapshot pruning](#snapshot-pruning) for how that works.
 
-Since the Desktop tokens file and `mcp.json` can both contain auth
-credentials, only use this if you're comfortable with that material living
-in your backup location (e.g. your own private cloud storage).
+Several of the files above hold auth/session credentials — see
+[Security](#security) before you install, especially if you're deciding
+whether to back them up at all.
 
 ## Contents
 
 - [Install](#install)
 - [Choosing a backup location](#choosing-a-backup-location)
+- [Security](#security)
 - [Snapshot pruning](#snapshot-pruning)
 - [Usage examples](#usage-examples)
 - [Restore](#restore)
@@ -94,6 +96,8 @@ CLAUDE_BACKUP_MINUTE=0 \
   read by the backup script itself, not just the installer)
 - `CLAUDE_BACKUP_KEEP` — number of dated snapshots to retain
 - `CLAUDE_BACKUP_HOUR` / `CLAUDE_BACKUP_MINUTE` — daily run time (24h)
+- `CLAUDE_BACKUP_INCLUDE_CREDENTIALS` — set to `0` to skip
+  credential-bearing files entirely; see [Security](#security)
 
 ## Choosing a backup location
 
@@ -125,6 +129,62 @@ exported in your shell — launchd doesn't inherit your terminal's
 environment, so `install.sh` bakes it into the launchd job's
 `EnvironmentVariables` at install time. To change the backup location
 later, just re-run `install.sh` with the new value.
+
+## Security
+
+**This backup is only as secure as wherever you point `CLAUDE_BACKUP_DEST`.**
+It doesn't encrypt anything — it copies files. If your cloud account
+(Google Drive, OneDrive, etc.) is ever compromised, shared, or synced onto
+a device you don't fully trust, everything in the backup is exposed too,
+including the credential files below. Use a private, personal account
+with strong auth (2FA) on whatever you point this at, and treat the
+backup location itself as security-sensitive, not just the original
+files.
+
+**Cloud version history can outlive your local cleanup.** If a token
+ever leaks and you rotate it, deleting the old backup file locally
+doesn't necessarily purge it — Google Drive/OneDrive/etc. often keep prior
+versions of a file for weeks or months after it's overwritten or deleted,
+depending on their retention settings and your plan.
+
+**What's actually credential-bearing:**
+
+| File | Source | Contains |
+|---|---|---|
+| `buddy-tokens.json` | Desktop | auth/session tokens |
+| `config.json` | Desktop | OAuth token caches |
+| `claude_desktop_config.json` | Desktop | can include API keys in MCP server `env` blocks |
+| `mcp.json` | CLI | can include API keys in MCP server `env` blocks |
+
+Everything else backed up (session transcripts, memory files, settings,
+snapshot history, etc.) is not itself a credential, though session
+transcripts and memory files may of course contain whatever sensitive
+things you've discussed or asked Claude to remember.
+
+**To back up without any of the credential-bearing files**, set
+`CLAUDE_BACKUP_INCLUDE_CREDENTIALS=0` — the four files above are skipped
+entirely (Desktop's rsync doesn't allowlist them; the CLI mirror gets
+explicit excludes for them). Trade-off: after a restore you'll need to
+re-authenticate and re-enter any MCP server credentials by hand.
+
+At setup:
+
+```bash
+CLAUDE_BACKUP_INCLUDE_CREDENTIALS=0 ./install.sh
+```
+
+Changing it later — same as any other setting, re-run `install.sh` (it
+must be set at install time, not just exported in your shell, for the
+same launchd-doesn't-inherit-your-environment reason as
+`CLAUDE_BACKUP_DEST` above):
+
+```bash
+CLAUDE_BACKUP_INCLUDE_CREDENTIALS=0 ./install.sh
+```
+
+Turning it off doesn't retroactively scrub credentials already sitting in
+older dated `snapshots/`, only `latest/` going forward — delete old
+snapshots by hand if you want those gone too.
 
 ## Snapshot pruning
 

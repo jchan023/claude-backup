@@ -16,6 +16,7 @@ DEST="${CLAUDE_BACKUP_DEST:-$HOME/Backups/ClaudeDesktop}"
 KEEP="${CLAUDE_BACKUP_KEEP:-3}"
 MAX_LOG_LINES="${CLAUDE_BACKUP_LOG_MAX_LINES:-2000}"
 NOTIFY="${CLAUDE_BACKUP_NOTIFY:-1}"
+INCLUDE_CREDENTIALS="${CLAUDE_BACKUP_INCLUDE_CREDENTIALS:-1}"
 
 mkdir -p "$HOME/Library/Scripts" "$HOME/Library/LaunchAgents" "$(dirname "$LOG")"
 cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$DEST_SCRIPT"
@@ -43,6 +44,8 @@ cat > "$PLIST_PATH" <<PLIST
         <string>$MAX_LOG_LINES</string>
         <key>CLAUDE_BACKUP_NOTIFY</key>
         <string>$NOTIFY</string>
+        <key>CLAUDE_BACKUP_INCLUDE_CREDENTIALS</key>
+        <string>$INCLUDE_CREDENTIALS</string>
     </dict>
     <key>StartCalendarInterval</key>
     <dict>
@@ -67,4 +70,9 @@ launchctl load "$PLIST_PATH"
 echo "Installed $DEST_SCRIPT"
 echo "Loaded launchd job '$PLIST_LABEL' (runs daily at $HOUR:$(printf '%02d' "$MINUTE"))"
 echo "Backups go to: $DEST (keeping $KEEP snapshots)"
+if [ "$INCLUDE_CREDENTIALS" = "1" ]; then
+  echo "Credentials: included (buddy-tokens.json, config.json, mcp.json, etc.)"
+else
+  echo "Credentials: excluded"
+fi
 echo "Logs: $LOG"
