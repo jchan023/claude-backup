@@ -1,16 +1,20 @@
 # claude-backup
 
-[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.0.1)
+[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.1.0)
 [![ShellCheck](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assets License: MIT](https://img.shields.io/badge/Assets-MIT-blue.svg)](LICENSE)
 
-Daily backup of Claude Desktop's config, auth tokens, and session history
-(macOS) to your backup location of choice, using `launchd`.
+Daily backup of both **Claude Desktop's** app state and the **Claude
+Code CLI's** state (macOS) to your backup location of choice, using
+`launchd`.
 
 ![Usage demo](assets/demo.svg)
 
-It backs up:
+It backs up two sources, into `latest/desktop/` and `latest/cli/`
+respectively:
+
+**Claude Desktop** (`~/Library/Application Support/Claude`):
 
 - `claude_desktop_config.json`, `config.json`, `buddy-tokens.json` — app
   config and auth/session tokens (lets you skip re-logging-in after a
@@ -21,18 +25,32 @@ It backs up:
   session history
 
 It deliberately **excludes** `Cache/`, `Code Cache/`, `GPUCache/`,
-`IndexedDB/`, `Local Storage/`, and similar browser-cache directories —
-these regenerate automatically and just waste space (Claude Desktop's data
-directory is a Chromium/Electron profile, so most of its multi-GB footprint
-is disposable cache).
+`IndexedDB/`, `Local Storage/`, and similar browser-cache directories from
+this source — they regenerate automatically and just waste space (Claude
+Desktop's data directory is a Chromium/Electron profile, so most of its
+multi-GB footprint is disposable cache). It also excludes
+`local-agent-mode-sessions/skills-plugin/` specifically — that holds the
+bundled built-in skill implementations shipped with every install (not
+anything you created), so it's reinstalled automatically rather than worth
+backing up.
+
+**Claude Code CLI** (`~/.claude`) — mirrored wholesale, no allowlist,
+since it's small (tens of MB, not GBs):
+
+- `settings.json` — CLI settings
+- `mcp.json` — your MCP server definitions
+- `plugins/installed_plugins.json`, `plugins/known_marketplaces.json` —
+  installed plugins and marketplaces
+- `projects/` — Claude Code session transcripts **and your memory system**
+  (`projects/**/memory/MEMORY.md` and every individual memory file)
 
 Keeps a `latest/` mirror plus a small number of dated snapshots so you can
 recover from an accidental overwrite, not just the most recent state — see
 [Snapshot pruning](#snapshot-pruning) for how that works.
 
-Since the tokens file contains auth/session credentials, only use this if
-you're comfortable with that material living in your backup location (e.g.
-your own private cloud storage).
+Since the Desktop tokens file and `mcp.json` can both contain auth
+credentials, only use this if you're comfortable with that material living
+in your backup location (e.g. your own private cloud storage).
 
 ## Contents
 
@@ -157,6 +175,12 @@ List available snapshots to restore from:
 ls ~/Backups/ClaudeDesktop/snapshots
 ```
 
+Check that both sources are actually being captured:
+
+```bash
+ls ~/Backups/ClaudeDesktop/latest/desktop ~/Backups/ClaudeDesktop/latest/cli
+```
+
 Change the schedule to 6:30 PM and keep 7 days of history instead of the
 defaults:
 
@@ -166,10 +190,13 @@ CLAUDE_BACKUP_HOUR=18 CLAUDE_BACKUP_MINUTE=30 CLAUDE_BACKUP_KEEP=7 ./install.sh
 
 ## Restore
 
-1. Install Claude Desktop and quit it.
-2. Copy files from your backup's `latest/` (or a specific
-   `snapshots/YYYY-MM-DD/`) into `~/Library/Application Support/Claude/`.
-3. Relaunch Claude Desktop.
+1. Install Claude Desktop and the Claude Code CLI, and quit/exit both.
+2. Copy files from your backup's `latest/desktop/` (or a specific
+   `snapshots/YYYY-MM-DD/desktop/`) into
+   `~/Library/Application Support/Claude/`.
+3. Copy files from `latest/cli/` (or the matching `snapshots/.../cli/`)
+   into `~/.claude/`.
+4. Relaunch Claude Desktop / the CLI.
 
 ## Uninstall
 
@@ -197,10 +224,10 @@ grep WARNING ~/Library/Logs/claude-desktop-backup.log
 
 A macOS notification (via `osascript`) fires when:
 
-- the script exits with an error (e.g. `rsync` fails) — "Claude Desktop
-  Backup Failed"
-- a snapshot can't be fully removed during pruning — "Claude Desktop
-  Backup Warning" (see [Snapshot pruning](#snapshot-pruning))
+- the script exits with an error (e.g. `rsync` fails) — "Claude Backup
+  Failed"
+- a snapshot can't be fully removed during pruning — "Claude Backup
+  Warning" (see [Snapshot pruning](#snapshot-pruning))
 
 Disable notifications with `CLAUDE_BACKUP_NOTIFY=0` (same caveat as the
 other settings — set it when running `install.sh`, not just in your

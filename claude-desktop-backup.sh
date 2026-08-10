@@ -1,13 +1,17 @@
 #!/bin/bash
-# Backs up Claude Desktop's config, auth tokens, and session history to
-# your chosen backup location (a cloud-synced folder or any other target
-# directory), keeping a small number of rotating dated snapshots.
+# Backs up Claude Desktop's app state and the Claude Code CLI's state
+# (~/.claude, including your memory files and MCP config) to your chosen
+# backup location (a cloud-synced folder or any other target directory),
+# keeping a small number of rotating dated snapshots.
 # See README.md for setup via install.sh.
 set -euo pipefail
 
-SRC="$HOME/Library/Application Support/Claude"
+DESKTOP_SRC="$HOME/Library/Application Support/Claude"
+CLI_SRC="$HOME/.claude"
 ROOT="${CLAUDE_BACKUP_DEST:-$HOME/Backups/ClaudeDesktop}"
 LATEST="$ROOT/latest"
+DESKTOP_LATEST="$LATEST/desktop"
+CLI_LATEST="$LATEST/cli"
 SNAPSHOTS="$ROOT/snapshots"
 TODAY="$SNAPSHOTS/$(date '+%Y-%m-%d')"
 LOG="$HOME/Library/Logs/claude-desktop-backup.log"
@@ -21,9 +25,9 @@ notify() {
   /usr/bin/osascript -e "display notification \"$message\" with title \"$title\"" >/dev/null 2>&1 || true
 }
 
-trap 'notify "Claude Desktop Backup Failed" "Script exited with an error — check ~/Library/Logs/claude-desktop-backup.log"' ERR
+trap 'notify "Claude Backup Failed" "Script exited with an error — check ~/Library/Logs/claude-desktop-backup.log"' ERR
 
-mkdir -p "$LATEST" "$SNAPSHOTS" "$(dirname "$LOG")"
+mkdir -p "$DESKTOP_LATEST" "$CLI_LATEST" "$SNAPSHOTS" "$(dirname "$LOG")"
 
 rsync -a --delete --prune-empty-dirs \
   --include="claude_desktop_config.json" \
@@ -38,7 +42,16 @@ rsync -a --delete --prune-empty-dirs \
   --exclude="*/skills-plugin/" \
   --include="*/" \
   --exclude="*" \
-  "$SRC/" "$LATEST/" >> "$LOG" 2>&1
+  "$DESKTOP_SRC/" "$DESKTOP_LATEST/" >> "$LOG" 2>&1
+
+# ~/.claude is the Claude Code CLI's own state (MCP config, plugins,
+# settings, session transcripts, and your memory files under
+# projects/**/memory/) — small enough (tens of MB, not GBs) to mirror
+# wholesale rather than allowlisting individual files like above.
+if [ -d "$CLI_SRC" ]; then
+  rsync -a --delete --prune-empty-dirs \
+    "$CLI_SRC/" "$CLI_LATEST/" >> "$LOG" 2>&1
+fi
 
 # Dated snapshot of today's backup (hardlinked, so it costs no extra space
 # unless a file actually changed).
@@ -56,7 +69,7 @@ find "$SNAPSHOTS" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((KEEP +
   fi
   if [ -d "$old" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') WARNING: failed to fully remove $old (will retry next run)" >> "$LOG"
-    notify "Claude Desktop Backup Warning" "Could not fully remove old snapshot $(basename "$old") — check the log."
+    notify "Claude Backup Warning" "Could not fully remove old snapshot $(basename "$old") — check the log."
   else
     echo "$(date '+%Y-%m-%d %H:%M:%S') pruned $old" >> "$LOG"
   fi

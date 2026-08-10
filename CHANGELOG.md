@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-09
+
+### Added
+
+- Back up `~/.claude` (the Claude Code CLI's own state) in addition to
+  Claude Desktop's app state. Previously the backup only covered
+  `~/Library/Application Support/Claude`, which meant `mcp.json`,
+  installed plugins, CLI settings, session transcripts, and — most
+  importantly — the entire memory system under `projects/**/memory/` were
+  never backed up at all. Mirrored wholesale (no allowlist) since it's
+  small (tens of MB vs. Desktop's multi-GB profile).
+
+### Changed
+
+- **Backup layout**: `latest/` and each dated `snapshots/YYYY-MM-DD/` now
+  contain two subdirectories, `desktop/` and `cli/`, instead of Desktop's
+  files sitting directly at the top level. Existing backups written by
+  older versions are not migrated automatically — see
+  [Restore](README.md#restore) for the current layout.
+
 ## [1.0.1] - 2026-08-09
 
 ### Fixed
@@ -59,6 +79,7 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/jchan023/claude-backup/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/jchan023/claude-backup/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/jchan023/claude-backup/releases/tag/v1.0.0
