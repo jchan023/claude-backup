@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-08-10
+
+### Security
+
+- Fixed an AppleScript injection vulnerability in `notify()`: the
+  snapshot-pruning warning interpolated `$(basename "$old")` — a
+  directory name from the backup destination — directly into an
+  `osascript -e` string. A directory name containing a `"` could break
+  out of the AppleScript string and run arbitrary shell commands via
+  `do shell script`, executed with the user's privileges. Confirmed
+  exploitable with a proof-of-concept payload before fixing. Since the
+  backup destination is typically a cloud-synced folder, the practical
+  attack surface is anyone who can write into it — a compromised cloud
+  account, a shared-folder collaborator, or another device sharing the
+  same account. Fixed by passing title/message through environment
+  variables and reading them with AppleScript's `system attribute`
+  instead of string-splicing them into the script source; re-verified
+  the same payload is now inert.
+- Pinned CI's GitHub Actions (`actions/checkout`, `ludeeus/action-shellcheck`)
+  to immutable commit SHAs instead of mutable tags, so a compromised or
+  re-pointed upstream tag can't silently pull different code into CI.
+
 ## [1.1.1] - 2026-08-10
 
 ### Fixed
@@ -93,7 +115,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/jchan023/claude-backup/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/jchan023/claude-backup/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/jchan023/claude-backup/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/jchan023/claude-backup/compare/v1.0.0...v1.0.1

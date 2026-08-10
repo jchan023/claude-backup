@@ -22,7 +22,15 @@ NOTIFY="${CLAUDE_BACKUP_NOTIFY:-1}"
 notify() {
   local title="$1" message="$2"
   [ "$NOTIFY" = "1" ] || return 0
-  /usr/bin/osascript -e "display notification \"$message\" with title \"$title\"" >/dev/null 2>&1 || true
+  # title/message are passed via env vars and read with `system attribute`
+  # rather than spliced into the AppleScript source string. Snapshot
+  # directory names (e.g. in the pruning warning below) aren't fully
+  # trusted input — on a cloud-synced backup location, anyone who can
+  # write into that folder controls those names — and string-splicing
+  # them into `-e` would let a name containing a `"` break out of the
+  # AppleScript string and run arbitrary commands via `do shell script`.
+  CLAUDE_BACKUP_NOTIFY_TITLE="$title" CLAUDE_BACKUP_NOTIFY_MSG="$message" \
+    /usr/bin/osascript -e 'display notification (system attribute "CLAUDE_BACKUP_NOTIFY_MSG") with title (system attribute "CLAUDE_BACKUP_NOTIFY_TITLE")' >/dev/null 2>&1 || true
 }
 
 trap 'notify "Claude Backup Failed" "Script exited with an error — check ~/Library/Logs/claude-desktop-backup.log"' ERR
