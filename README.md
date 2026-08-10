@@ -1,6 +1,6 @@
 # claude-backup
 
-[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.1.0)
+[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.1.1)
 [![ShellCheck](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assets License: MIT](https://img.shields.io/badge/Assets-MIT-blue.svg)](LICENSE)
@@ -28,11 +28,17 @@ It deliberately **excludes** `Cache/`, `Code Cache/`, `GPUCache/`,
 `IndexedDB/`, `Local Storage/`, and similar browser-cache directories from
 this source — they regenerate automatically and just waste space (Claude
 Desktop's data directory is a Chromium/Electron profile, so most of its
-multi-GB footprint is disposable cache). It also excludes
-`local-agent-mode-sessions/skills-plugin/` specifically — that holds the
-bundled built-in skill implementations shipped with every install (not
-anything you created), so it's reinstalled automatically rather than worth
-backing up.
+multi-GB footprint is disposable cache).
+
+`local-agent-mode-sessions/skills-plugin/` (Anthropic's built-in skill
+implementations, e.g. `xlsx`/`pdf`/`docx`) **is** backed up, even though
+it's app-managed content that the app likely re-syncs on its own —
+everything points that way (`.claude-plugin/plugin.json` identifies it as
+"Anthropic-managed skills for Claude Desktop", and `config.json` tracks a
+`remote_marketplace_migration_done_v1` flag), but that's inference, not a
+verified guarantee, and there was no safe way to test it against a real
+install without risking the live app. At ~4MB it's cheap enough to just
+include rather than gamble on it.
 
 **Claude Code CLI** (`~/.claude`) — mirrored wholesale, no allowlist,
 since it's small (tens of MB, not GBs):

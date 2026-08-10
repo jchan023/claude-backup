@@ -39,7 +39,6 @@ rsync -a --delete --prune-empty-dirs \
   --include="cowork-enabled-cli-ops.json" \
   --include="claude-code-sessions/***" \
   --include="local-agent-mode-sessions/***" \
-  --exclude="*/skills-plugin/" \
   --include="*/" \
   --exclude="*" \
   "$DESKTOP_SRC/" "$DESKTOP_LATEST/" >> "$LOG" 2>&1
