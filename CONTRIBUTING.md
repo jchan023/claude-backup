@@ -16,11 +16,21 @@ relevant lines from `~/Library/Logs/claude-desktop-backup.log`.
    PR — CI runs it on every push/PR and will fail on warnings:
    ```bash
    brew install shellcheck
-   shellcheck *.sh
+   shellcheck *.sh tests/*.sh
    ```
-4. Test against a throwaway `$HOME` rather than your real one, since the
-   scripts write to `~/Library/Scripts`, `~/Library/LaunchAgents`, and
-   `~/Library/Logs`:
+4. Run the functional test suite — CI runs this too, on a `macos-latest`
+   runner, since `launchctl`/`osascript`/real bash 3.2 behavior can't be
+   tested on Linux:
+   ```bash
+   ./tests/run.sh
+   ```
+   It runs everything against throwaway `$HOME`s via `mktemp -d`, never
+   your real one. It's plain bash assertions, no framework — add a new
+   `assert_*` call for new behavior rather than reaching for a test
+   framework dependency. If you're testing something interactively
+   instead of adding a test, use a throwaway `$HOME` rather than your
+   real one, since the scripts write to `~/Library/Scripts`,
+   `~/Library/LaunchAgents`, and `~/Library/Logs`:
    ```bash
    FAKE_HOME=$(mktemp -d)
    HOME="$FAKE_HOME" ./install.sh
@@ -36,7 +46,10 @@ relevant lines from `~/Library/Logs/claude-desktop-backup.log`.
    array expanded with `"${ARR[@]}"` under `set -u` throws "unbound
    variable" in 3.2 but not in 4+). A change that passes `shellcheck` and
    works under your interactive shell can still break under the actual
-   interpreter launchd and `install.sh` invoke.
+   interpreter launchd and `install.sh` invoke. Also avoid piping live
+   into `grep -q` in tests: it exits after its first match and closes
+   the pipe, which can SIGPIPE a still-writing upstream process — capture
+   output into a variable first and match against that instead.
 5. Open a PR describing what changed and why.
 
 ## Scope

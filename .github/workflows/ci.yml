@@ -1,14 +1,14 @@
-name: ShellCheck
+name: CI
 
 on:
   push:
     paths:
       - "**/*.sh"
-      - ".github/workflows/shellcheck.yml"
+      - ".github/workflows/ci.yml"
   pull_request:
     paths:
       - "**/*.sh"
-      - ".github/workflows/shellcheck.yml"
+      - ".github/workflows/ci.yml"
 
 jobs:
   shellcheck:
@@ -17,3 +17,10 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Run functional test suite
+        run: ./tests/run.sh

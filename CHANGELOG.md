@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-11
+
+### Added
+
+- `tests/run.sh` — a lightweight functional test suite (plain bash
+  assertions, no framework) covering `install.sh`, `claude-desktop-backup.sh`,
+  `restore.sh`, and `uninstall.sh`: plist validity and actual launchd
+  registration (not just a claimed success), rejecting non-integer
+  settings, XML-escaping, both credential modes, snapshot pruning
+  keeping exactly `KEEP` entries, `restore.sh --list`/`latest`/dated
+  restore with byte-identical content, the path-traversal guard, and
+  `uninstall.sh` actually deregistering the job while preserving
+  backups. Every one of these was previously verified by hand, ad hoc,
+  in conversation — none of it was captured anywhere a future change
+  could break without someone noticing.
+- CI: renamed the workflow from `shellcheck.yml` to `ci.yml` (badge
+  updated) and added a `test` job on `macos-latest` running
+  `tests/run.sh` — `launchctl`/`osascript`/real bash 3.2 behavior can't
+  be exercised on the existing Linux `shellcheck` job.
+
+### Fixed
+
+- Two bugs in the test suite itself, caught while writing it: piping
+  `restore.sh --list`'s multi-line output live into `grep -q` is
+  timing-dependent — `grep -q` exits after its first match and closes
+  the pipe, which can SIGPIPE a still-writing upstream process. Fixed by
+  capturing output into a variable first. Also an assertion assumed
+  `launchctl list` returns exit code `1` for "job not found"; on this
+  system it returns `113`. Fixed by checking for any non-zero exit
+  instead of a specific code.
+
 ## [1.3.3] - 2026-08-11
 
 ### Fixed
@@ -223,7 +254,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/jchan023/claude-backup/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/jchan023/claude-backup/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/jchan023/claude-backup/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/jchan023/claude-backup/compare/v1.3.0...v1.3.1
