@@ -64,14 +64,27 @@ assert_file "$HOME1/Library/Scripts/claude-desktop-backup.sh" "backup script ins
 
 echo "== install.sh: wrapper .app bundle (for scoping Full Disk Access) =="
 APP1="$HOME1/Library/Application Support/ClaudeBackup.app"
+APP1_EXE="$APP1/Contents/MacOS/applet"
 assert_file "$APP1/Contents/Info.plist" "wrapper app Info.plist exists"
 plutil -lint "$APP1/Contents/Info.plist" >/dev/null 2>&1
 assert_eq "$?" "0" "wrapper app Info.plist is valid XML"
-assert_file "$APP1/Contents/MacOS/claude-desktop-backup" "wrapper app executable exists"
-if [ -x "$APP1/Contents/MacOS/claude-desktop-backup" ]; then
+BUNDLE_ID_CHECK=$(plutil -extract CFBundleIdentifier raw -o - "$APP1/Contents/Info.plist" 2>/dev/null)
+assert_eq "$BUNDLE_ID_CHECK" "com.local.claude-desktop-backup" "wrapper app has a stable CFBundleIdentifier (needed for TCC to remember a grant)"
+assert_file "$APP1_EXE" "wrapper app executable exists"
+if [ -x "$APP1_EXE" ]; then
   pass "wrapper app executable has the exec bit set"
 else
   fail "wrapper app executable has the exec bit set"
+fi
+# Must be a real compiled binary, not a script with a #!/bin/bash
+# shebang — confirmed the hard way that a shebang wrapper creates no
+# TCC identity of its own and silently piggybacks on /bin/bash's grant
+# instead of actually scoping anything. `file` reports a shebang script
+# as "... script text", never "Mach-O".
+if file "$APP1_EXE" | grep -q "Mach-O"; then
+  pass "wrapper app executable is a real compiled binary, not a shebang script"
+else
+  fail "wrapper app executable is a real compiled binary, not a shebang script (got: $(file "$APP1_EXE"))"
 fi
 if command -v codesign >/dev/null 2>&1; then
   codesign --verify --deep --strict "$APP1" >/dev/null 2>&1
@@ -87,7 +100,12 @@ else
 fi
 echo "== wrapper app: launchd actually running it end-to-end works =="
 rm -rf "$HOME1/Backups"
-( cd "$REPO_DIR" && HOME="$HOME1" CLAUDE_BACKUP_DEST="$HOME1/Backups" "$APP1/Contents/MacOS/claude-desktop-backup" >/dev/null )
+# do shell script (what the compiled applet uses internally) forwards
+# its own process's environment to the shell command it runs, so
+# setting HOME/CLAUDE_BACKUP_DEST here works the same way it would via
+# launchd's EnvironmentVariables — verified directly against the real
+# machine before relying on it here.
+( cd "$REPO_DIR" && HOME="$HOME1" CLAUDE_BACKUP_DEST="$HOME1/Backups" "$APP1_EXE" >/dev/null )
 assert_eq "$?" "0" "direct exec of the wrapper's executable (what launchd does) exits 0"
 assert_file "$HOME1/Backups/latest/desktop/config.json" "wrapper-triggered backup produces real output"
 

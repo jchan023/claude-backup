@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-08-11
+
+### Fixed
+
+- **1.5.0's wrapper app didn't actually scope anything — confirmed by
+  checking the TCC database directly.** `Contents/MacOS/claude-desktop-backup`
+  was the backup script itself with its `#!/bin/bash` shebang. A
+  bundle's `CFBundleExecutable` naming that file doesn't change what the
+  kernel actually runs: it still execve's `/bin/bash` as the top-level
+  process (that's what a shebang *is*), and Full Disk Access is checked
+  against whatever process is actually performing the file I/O — not
+  against the bundle nominally wrapping it. Queried
+  `/Library/Application Support/com.apple.TCC/TCC.db` directly after a
+  real run: no entry existed for the wrapper's bundle identifier at all,
+  and the backup succeeded anyway — proving it was silently still
+  riding on the pre-existing `/bin/bash` grant the whole time. 1.5.0
+  shipped no real improvement over granting `/bin/bash` directly.
+- Fixed by generating the wrapper with `osacompile` (ships with macOS,
+  no Xcode needed) instead of hand-building the bundle: its
+  `Contents/MacOS/applet` is a genuine compiled Mach-O binary. Verified
+  the fix the same way the bug was found — checked the TCC database
+  after a real run against the actual protected path and got a new,
+  distinct, *denied* entry for the app's bundle identifier (`auth_value=0`),
+  proving TCC now evaluates it as its own identity instead of falling
+  through to `/bin/bash`. Also verified `do shell script` (what the
+  compiled applet uses to invoke the actual backup script) correctly
+  forwards environment variables from `launchd`'s `EnvironmentVariables`
+  through to the script, since the whole `CLAUDE_BACKUP_DEST` mechanism
+  depends on that.
+- `tests/run.sh` gained a permanent regression guard for the actual root
+  cause: asserts the wrapper's executable is reported as `Mach-O` by
+  `file`, not a script — the exact thing that silently failed in 1.5.0
+  despite passing every other check at the time (bundle validity,
+  codesign, launchd wiring, and even a real end-to-end run all looked
+  fine; only inspecting the TCC database directly revealed the flaw).
+
+If you installed 1.5.0, re-run `install.sh` to rebuild the wrapper
+properly, then grant Full Disk Access to
+`~/Library/Application Support/ClaudeBackup.app` again (the identity
+changed, so any grant made against the 1.5.0 bundle isn't meaningful —
+it was never being checked in the first place).
+
 ## [1.5.0] - 2026-08-11
 
 ### Added
@@ -293,7 +335,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/jchan023/claude-backup/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/jchan023/claude-backup/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/jchan023/claude-backup/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/jchan023/claude-backup/compare/v1.3.2...v1.3.3

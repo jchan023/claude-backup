@@ -6,7 +6,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST_SCRIPT="$HOME/Library/Scripts/claude-desktop-backup.sh"
 APP_DIR="$HOME/Library/Application Support/ClaudeBackup.app"
-APP_EXECUTABLE="$APP_DIR/Contents/MacOS/claude-desktop-backup"
+# osacompile always names its compiled binary "applet" — not
+# configurable, and not worth renaming after the fact.
+APP_EXECUTABLE="$APP_DIR/Contents/MacOS/applet"
 BUNDLE_ID="com.local.claude-desktop-backup"
 PLIST_LABEL="com.local.claude-desktop-backup"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
@@ -47,42 +49,39 @@ cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$DEST_SCRIPT"
 chmod +x "$DEST_SCRIPT"
 
 # Wrap the script in a minimal .app bundle instead of pointing the launchd
-# job at the shared system /bin/bash directly. A bundle's "executable"
-# only needs to be a valid ELF/Mach-O binary or, as here, a script with a
-# shebang — no compiler needed (the same trick tools like Platypus use).
-# The point: Full Disk Access can then be granted to this one app
-# specifically, instead of to /bin/bash system-wide, which every other
-# shell script on the machine would otherwise also inherit. See
-# README.md's Troubleshooting section.
-mkdir -p "$APP_DIR/Contents/MacOS"
-cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleIdentifier</key>
-    <string>$BUNDLE_ID</string>
-    <key>CFBundleName</key>
-    <string>ClaudeBackup</string>
-    <key>CFBundleExecutable</key>
-    <string>claude-desktop-backup</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>LSBackgroundOnly</key>
-    <true/>
-</dict>
-</plist>
-INFOPLIST
-cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$APP_EXECUTABLE"
-chmod +x "$APP_EXECUTABLE"
+# job at the shared system /bin/bash directly, so Full Disk Access can be
+# granted to this one app specifically instead of to /bin/bash
+# system-wide (which every other shell script on the machine would
+# otherwise also inherit). See README.md's Troubleshooting section.
+#
+# This MUST be a real compiled binary, not a script with a #!/bin/bash
+# shebang — confirmed the hard way: a shebang "executable" causes the
+# kernel to exec /bin/bash as the actual running process, and TCC's
+# Full Disk Access check is keyed to that process, not to the bundle
+# nominally wrapping it. A shebang wrapper creates no TCC identity of
+# its own at all and silently piggybacks on whatever grant /bin/bash
+# already has — verified directly against the TCC database. osacompile
+# (ships with macOS, no Xcode needed) produces an actual Mach-O binary
+# that gets its own distinct, independently-evaluated TCC identity —
+# also verified directly: an ungranted osacompile app gets a real
+# (denied) entry in the TCC database, unlike the shebang version.
+rm -rf "$APP_DIR"
+APPLESCRIPT_SRC="$(mktemp)"
+trap 'rm -f "$APPLESCRIPT_SRC"' EXIT
+printf 'do shell script "%s"\n' "'${DEST_SCRIPT}'" > "$APPLESCRIPT_SRC"
+osacompile -o "$APP_DIR" "$APPLESCRIPT_SRC"
+rm -f "$APPLESCRIPT_SRC"
+trap - EXIT
 
-# Ad-hoc sign (no paid Developer ID needed — this never leaves the
-# machine it's built on) so the bundle has a stable identity for TCC and
-# so Gatekeeper doesn't need to make a first-launch trust decision.
+# osacompile doesn't set a CFBundleIdentifier by default — without one,
+# TCC has no stable identity to remember a grant against between runs.
+plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" "$APP_DIR/Contents/Info.plist"
+plutil -replace LSUIElement -bool true "$APP_DIR/Contents/Info.plist"
+
+# Editing Info.plist after osacompile's own signing invalidates that
+# signature, so re-sign. Ad hoc (no paid Developer ID needed — this
+# never leaves the machine it's built on) just to give the bundle a
+# stable identity and avoid a Gatekeeper first-launch decision.
 if command -v codesign >/dev/null 2>&1; then
   codesign --force --sign - "$APP_DIR" 2>/dev/null || echo "Warning: codesign failed; continuing with an unsigned bundle." >&2
 else
