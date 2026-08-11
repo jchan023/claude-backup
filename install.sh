@@ -1,9 +1,13 @@
 #!/bin/bash
-# Installs claude-desktop-backup.sh and a launchd job that runs it daily.
+# Installs claude-desktop-backup.sh, wraps it in a minimal .app bundle, and
+# installs a launchd job that runs the wrapper daily.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST_SCRIPT="$HOME/Library/Scripts/claude-desktop-backup.sh"
+APP_DIR="$HOME/Library/Application Support/ClaudeBackup.app"
+APP_EXECUTABLE="$APP_DIR/Contents/MacOS/claude-desktop-backup"
+BUNDLE_ID="com.local.claude-desktop-backup"
 PLIST_LABEL="com.local.claude-desktop-backup"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 LOG="$HOME/Library/Logs/claude-desktop-backup.log"
@@ -34,13 +38,64 @@ for n in "$HOUR" "$MINUTE" "$KEEP" "$MAX_LOG_LINES" "$NOTIFY" "$INCLUDE_CREDENTI
   esac
 done
 
+APP_EXECUTABLE_ESC="$(xml_escape "$APP_EXECUTABLE")"
 DEST_ESC="$(xml_escape "$DEST")"
-DEST_SCRIPT_ESC="$(xml_escape "$DEST_SCRIPT")"
 LOG_ESC="$(xml_escape "$LOG")"
 
 mkdir -p "$HOME/Library/Scripts" "$HOME/Library/LaunchAgents" "$(dirname "$LOG")"
 cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$DEST_SCRIPT"
 chmod +x "$DEST_SCRIPT"
+
+# Wrap the script in a minimal .app bundle instead of pointing the launchd
+# job at the shared system /bin/bash directly. A bundle's "executable"
+# only needs to be a valid ELF/Mach-O binary or, as here, a script with a
+# shebang — no compiler needed (the same trick tools like Platypus use).
+# The point: Full Disk Access can then be granted to this one app
+# specifically, instead of to /bin/bash system-wide, which every other
+# shell script on the machine would otherwise also inherit. See
+# README.md's Troubleshooting section.
+mkdir -p "$APP_DIR/Contents/MacOS"
+cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>$BUNDLE_ID</string>
+    <key>CFBundleName</key>
+    <string>ClaudeBackup</string>
+    <key>CFBundleExecutable</key>
+    <string>claude-desktop-backup</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>LSBackgroundOnly</key>
+    <true/>
+</dict>
+</plist>
+INFOPLIST
+cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$APP_EXECUTABLE"
+chmod +x "$APP_EXECUTABLE"
+
+# Ad-hoc sign (no paid Developer ID needed — this never leaves the
+# machine it's built on) so the bundle has a stable identity for TCC and
+# so Gatekeeper doesn't need to make a first-launch trust decision.
+if command -v codesign >/dev/null 2>&1; then
+  codesign --force --sign - "$APP_DIR" 2>/dev/null || echo "Warning: codesign failed; continuing with an unsigned bundle." >&2
+else
+  echo "Warning: codesign not found; continuing with an unsigned bundle." >&2
+fi
+
+# Register with Launch Services so System Settings' Full Disk Access
+# file picker recognizes it properly (name/icon) rather than as a bare
+# unknown bundle.
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+if [ -x "$LSREGISTER" ]; then
+  "$LSREGISTER" -f "$APP_DIR" >/dev/null 2>&1 || true
+fi
 
 cat > "$PLIST_PATH" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -51,8 +106,7 @@ cat > "$PLIST_PATH" <<PLIST
     <string>$PLIST_LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>$DEST_SCRIPT_ESC</string>
+        <string>$APP_EXECUTABLE_ESC</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
@@ -98,6 +152,7 @@ if ! launchctl list "$PLIST_LABEL" >/dev/null 2>&1; then
 fi
 
 echo "Installed $DEST_SCRIPT"
+echo "Wrapper app: $APP_DIR"
 echo "Loaded launchd job '$PLIST_LABEL' (runs daily at $HOUR:$(printf '%02d' "$MINUTE"))"
 echo "Backups go to: $DEST (keeping $KEEP snapshots)"
 if [ "$INCLUDE_CREDENTIALS" = "1" ]; then
@@ -106,3 +161,8 @@ else
   echo "Credentials: excluded"
 fi
 echo "Logs: $LOG"
+echo ""
+echo "If your backup destination is under ~/Library/CloudStorage/ (Google"
+echo "Drive, OneDrive, iCloud Drive, or similar), grant Full Disk Access to:"
+echo "  $APP_DIR"
+echo "System Settings -> Privacy & Security -> Full Disk Access -> + -> Cmd+Shift+G -> paste that path."

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-11
+
+### Added
+
+- `install.sh` now wraps the backup script in a minimal, ad-hoc-signed
+  `~/Library/Application Support/ClaudeBackup.app` bundle and points the
+  launchd job at it, instead of at `/bin/bash` directly. This scopes the
+  Full Disk Access grant needed for CloudStorage-backed destinations
+  (see 1.3.1's Troubleshooting entry) to just this one app — previously
+  granting `/bin/bash` Full Disk Access meant every other shell script
+  on the machine that happens to invoke `/bin/bash` inherited it too.
+  Doesn't eliminate the need for a per-machine grant (TCC permissions
+  are never transferable between machines, by Apple's design — no
+  configuration avoids that), only narrows what it covers. `uninstall.sh`
+  removes the wrapper app too.
+- `tests/run.sh` gained coverage for the wrapper: bundle/Info.plist
+  validity, the code signature passing `codesign --verify`, the launchd
+  job actually pointing at the wrapper instead of `/bin/bash`, and a
+  real end-to-end run through the wrapper's executable producing correct
+  output.
+
+### Fixed
+
+- Two more bugs caught writing the new tests: `plutil -extract ... raw`
+  on an array value just prints its element count, not the content —
+  fixed by extracting `xml1` instead and matching against that. And
+  `launchctl kickstart` on an already-registered job always uses the
+  real launchd-provided `$HOME` for the invoked process, not whatever
+  `$HOME` override was exported in the shell that ran `install.sh` —
+  discovered when a manual verification pass using a fake `$HOME` still
+  read real `~/Library/Application Support/Claude` and real `~/.claude`
+  content (though only their filenames were ever visible in output, and
+  the fake destination was deleted immediately after). No code fix
+  needed here — this is real `launchd` behavior, not a bug in the
+  scripts — but worth knowing before using `kickstart` to test against a
+  fake `$HOME`: it doesn't actually isolate the source paths, only
+  whatever's explicitly baked into the plist's `EnvironmentVariables`
+  (like `CLAUDE_BACKUP_DEST`).
+
 ## [1.4.0] - 2026-08-11
 
 ### Added
@@ -254,7 +293,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/jchan023/claude-backup/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/jchan023/claude-backup/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/jchan023/claude-backup/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/jchan023/claude-backup/compare/v1.3.1...v1.3.2

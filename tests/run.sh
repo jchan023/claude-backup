@@ -61,6 +61,36 @@ assert_eq "$?" "0" "generated plist is valid XML"
 launchctl list com.local.claude-desktop-backup >/dev/null 2>&1
 assert_eq "$?" "0" "launchd job is actually registered (not just claimed)"
 assert_file "$HOME1/Library/Scripts/claude-desktop-backup.sh" "backup script installed"
+
+echo "== install.sh: wrapper .app bundle (for scoping Full Disk Access) =="
+APP1="$HOME1/Library/Application Support/ClaudeBackup.app"
+assert_file "$APP1/Contents/Info.plist" "wrapper app Info.plist exists"
+plutil -lint "$APP1/Contents/Info.plist" >/dev/null 2>&1
+assert_eq "$?" "0" "wrapper app Info.plist is valid XML"
+assert_file "$APP1/Contents/MacOS/claude-desktop-backup" "wrapper app executable exists"
+if [ -x "$APP1/Contents/MacOS/claude-desktop-backup" ]; then
+  pass "wrapper app executable has the exec bit set"
+else
+  fail "wrapper app executable has the exec bit set"
+fi
+if command -v codesign >/dev/null 2>&1; then
+  codesign --verify --deep --strict "$APP1" >/dev/null 2>&1
+  assert_eq "$?" "0" "wrapper app passes codesign --verify"
+fi
+# `raw` format on an array just prints its element count, not the
+# content — xml1 gives the actual strings to match against.
+PLIST_PROG_ARGS=$(plutil -extract ProgramArguments xml1 -o - "$HOME1/Library/LaunchAgents/com.local.claude-desktop-backup.plist" 2>/dev/null)
+if [[ "$PLIST_PROG_ARGS" == *"ClaudeBackup.app"* ]]; then
+  pass "launchd job points at the wrapper app, not /bin/bash system-wide"
+else
+  fail "launchd job points at the wrapper app, not /bin/bash system-wide (got: $PLIST_PROG_ARGS)"
+fi
+echo "== wrapper app: launchd actually running it end-to-end works =="
+rm -rf "$HOME1/Backups"
+( cd "$REPO_DIR" && HOME="$HOME1" CLAUDE_BACKUP_DEST="$HOME1/Backups" "$APP1/Contents/MacOS/claude-desktop-backup" >/dev/null )
+assert_eq "$?" "0" "direct exec of the wrapper's executable (what launchd does) exits 0"
+assert_file "$HOME1/Backups/latest/desktop/config.json" "wrapper-triggered backup produces real output"
+
 cleanup_job "$HOME1"
 rm -rf "$HOME1"
 
@@ -154,6 +184,11 @@ else
   fail "uninstall.sh actually removes the launchd job (still registered)"
 fi
 assert_not_file "$HOME7/Library/Scripts/claude-desktop-backup.sh" "uninstall.sh removes the installed script"
+if [ ! -d "$HOME7/Library/Application Support/ClaudeBackup.app" ]; then
+  pass "uninstall.sh removes the wrapper app"
+else
+  fail "uninstall.sh removes the wrapper app"
+fi
 assert_file "$HOME7/Backups/ClaudeDesktop/latest/desktop/window-state.json" "uninstall.sh preserves existing backups"
 rm -rf "$HOME7"
 

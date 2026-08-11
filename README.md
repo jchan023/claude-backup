@@ -1,6 +1,6 @@
 # claude-backup
 
-[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.4.0)
+[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.5.0)
 [![CI](https://github.com/jchan023/claude-backup/actions/workflows/ci.yml/badge.svg)](https://github.com/jchan023/claude-backup/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assets License: MIT](https://img.shields.io/badge/Assets-MIT-blue.svg)](LICENSE)
@@ -349,22 +349,29 @@ This happens when `CLAUDE_BACKUP_DEST` resolves into a TCC-protected
 location — notably anything under `~/Library/CloudStorage/`, which
 several cloud-sync providers' top-level folders can be a symlink into on
 modern macOS. Check with `readlink` on your `CLAUDE_BACKUP_DEST` path if
-you're not sure. The backup runs as a background `launchd` agent
-invoking `/bin/bash` directly, and background agents don't automatically
-inherit the Full Disk Access an interactive Terminal session has — so
-this can pass every time you test it by hand and still fail on the
-actual scheduled run, since those go through different permission
-contexts.
+you're not sure. The backup runs as a background `launchd` agent, and
+background agents don't automatically inherit the Full Disk Access an
+interactive Terminal session has — so this can pass every time you test
+it by hand and still fail on the actual scheduled run, since those go
+through different permission contexts.
 
 Fix: **System Settings → Privacy & Security → Full Disk Access** → click
-**+** → press **Cmd+Shift+G** → type `/bin/bash` → add it → toggle it on.
+**+** → press **Cmd+Shift+G** → paste this path → add it → toggle it on:
 
-**Know what this actually grants first:** Full Disk Access is scoped to
-the executable (`/bin/bash`), not to this one script — every shell
-script on the system that happens to invoke `/bin/bash` (the vast
-majority of them, since it's the default interpreter) inherits it too,
-regardless of what launched it. This is a broad, system-wide grant, not
-something scoped to just this backup.
+```
+~/Library/Application Support/ClaudeBackup.app
+```
+
+`install.sh` wraps the backup script in this minimal `.app` bundle and
+points the launchd job at it, specifically so the Full Disk Access grant
+is scoped to just this one app — not to `/bin/bash` system-wide, which
+every other shell script on the machine would otherwise also inherit
+(there's no way to avoid *some* per-machine grant when writing into a
+TCC-protected cloud folder from a background process — this only
+controls what that grant actually covers). If you installed before this
+wrapper existed, re-run `install.sh` to pick it up, then grant Full Disk
+Access to the app path above instead of `/bin/bash` (you can remove the
+old `/bin/bash` grant once the app path is confirmed working).
 
 Once granted, trigger a run to confirm:
 
