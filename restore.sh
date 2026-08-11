@@ -30,6 +30,17 @@ done
 if [ "$FROM" = "latest" ]; then
   SRC="$ROOT/latest"
 else
+  # Snapshot names are always YYYY-MM-DD (see claude-desktop-backup.sh);
+  # reject anything else so a typo or "../.." can't restore from outside
+  # $ROOT/snapshots.
+  case "$FROM" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+    *)
+      echo "Invalid snapshot date: '$FROM' (expected YYYY-MM-DD)" >&2
+      echo "Run './restore.sh --list' to see available dates." >&2
+      exit 1
+      ;;
+  esac
   SRC="$ROOT/snapshots/$FROM"
 fi
 

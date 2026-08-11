@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-08-11
+
+### Security
+
+- `restore.sh` didn't validate its date argument before using it to
+  build a path (`$ROOT/snapshots/$FROM`). Confirmed with a working
+  proof-of-concept: `./restore.sh "../../elsewhere"` restores from
+  anywhere readable on the filesystem, not just `snapshots/`. Fixed by
+  requiring the argument to match `YYYY-MM-DD` (the only format
+  `claude-desktop-backup.sh` ever actually creates) before use.
+- `install.sh` interpolated `CLAUDE_BACKUP_DEST` and other settings
+  directly into the generated plist's XML without escaping. Confirmed a
+  destination path containing `&`/`<`/`>` produces invalid XML, which
+  makes `launchctl load` silently fail (it prints "Load failed" but
+  still returns exit 0 — a known quirk) while the script still prints
+  "Loaded launchd job..." — a false sense of security where you'd
+  believe backups are scheduled when they aren't. Fixed by XML-escaping
+  interpolated values, validating `CLAUDE_BACKUP_HOUR`/`MINUTE`/`KEEP`/
+  `LOG_MAX_LINES`/`NOTIFY`/`INCLUDE_CREDENTIALS` are plain integers
+  before use, and verifying the job is actually registered
+  (`launchctl list`) after loading instead of trusting `load`'s own
+  exit status.
+- README **Troubleshooting**: added a caveat that granting Full Disk
+  Access to `/bin/bash` (the fix in 1.3.1) is a broad, system-wide
+  grant — every shell script that invokes `/bin/bash`, not just this
+  one, inherits it.
+
 ## [1.3.1] - 2026-08-11
 
 ### Added
@@ -175,7 +202,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/jchan023/claude-backup/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/jchan023/claude-backup/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/jchan023/claude-backup/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/jchan023/claude-backup/compare/v1.1.2...v1.2.0

@@ -1,6 +1,6 @@
 # claude-backup
 
-[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.3.1)
+[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.3.2)
 [![ShellCheck](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assets License: MIT](https://img.shields.io/badge/Assets-MIT-blue.svg)](LICENSE)
@@ -358,7 +358,15 @@ contexts.
 
 Fix: **System Settings → Privacy & Security → Full Disk Access** → click
 **+** → press **Cmd+Shift+G** → type `/bin/bash` → add it → toggle it on.
-Then trigger a run to confirm:
+
+**Know what this actually grants first:** Full Disk Access is scoped to
+the executable (`/bin/bash`), not to this one script — every shell
+script on the system that happens to invoke `/bin/bash` (the vast
+majority of them, since it's the default interpreter) inherits it too,
+regardless of what launched it. This is a broad, system-wide grant, not
+something scoped to just this backup.
+
+Once granted, trigger a run to confirm:
 
 ```bash
 launchctl kickstart -k gui/$(id -u)/com.local.claude-desktop-backup

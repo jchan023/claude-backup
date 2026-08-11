@@ -18,6 +18,26 @@ MAX_LOG_LINES="${CLAUDE_BACKUP_LOG_MAX_LINES:-2000}"
 NOTIFY="${CLAUDE_BACKUP_NOTIFY:-1}"
 INCLUDE_CREDENTIALS="${CLAUDE_BACKUP_INCLUDE_CREDENTIALS:-1}"
 
+xml_escape() {
+  # & must come first so the escapes for the other characters aren't
+  # themselves re-escaped.
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' \
+    -e 's/"/\&quot;/g' -e "s/'/\\&apos;/g"
+}
+
+for n in "$HOUR" "$MINUTE" "$KEEP" "$MAX_LOG_LINES" "$NOTIFY" "$INCLUDE_CREDENTIALS"; do
+  case "$n" in
+    ''|*[!0-9]*)
+      echo "CLAUDE_BACKUP_HOUR/MINUTE/KEEP/LOG_MAX_LINES/NOTIFY/INCLUDE_CREDENTIALS must all be plain integers, got: '$n'" >&2
+      exit 1
+      ;;
+  esac
+done
+
+DEST_ESC="$(xml_escape "$DEST")"
+DEST_SCRIPT_ESC="$(xml_escape "$DEST_SCRIPT")"
+LOG_ESC="$(xml_escape "$LOG")"
+
 mkdir -p "$HOME/Library/Scripts" "$HOME/Library/LaunchAgents" "$(dirname "$LOG")"
 cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$DEST_SCRIPT"
 chmod +x "$DEST_SCRIPT"
@@ -32,12 +52,12 @@ cat > "$PLIST_PATH" <<PLIST
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>$DEST_SCRIPT</string>
+        <string>$DEST_SCRIPT_ESC</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
         <key>CLAUDE_BACKUP_DEST</key>
-        <string>$DEST</string>
+        <string>$DEST_ESC</string>
         <key>CLAUDE_BACKUP_KEEP</key>
         <string>$KEEP</string>
         <key>CLAUDE_BACKUP_LOG_MAX_LINES</key>
@@ -57,15 +77,25 @@ cat > "$PLIST_PATH" <<PLIST
     <key>RunAtLoad</key>
     <false/>
     <key>StandardOutPath</key>
-    <string>$LOG</string>
+    <string>$LOG_ESC</string>
     <key>StandardErrorPath</key>
-    <string>$LOG</string>
+    <string>$LOG_ESC</string>
 </dict>
 </plist>
 PLIST
 
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
 launchctl load "$PLIST_PATH"
+
+# `launchctl load` can print "Load failed" and still exit 0 (a known
+# quirk), so confirm the job actually registered instead of trusting its
+# own exit status — otherwise this would print success on a job that
+# silently isn't scheduled at all.
+if ! launchctl list "$PLIST_LABEL" >/dev/null 2>&1; then
+  echo "launchctl reported the job as loaded, but it isn't registered — check for XML/plist errors:" >&2
+  plutil -lint "$PLIST_PATH" >&2 || true
+  exit 1
+fi
 
 echo "Installed $DEST_SCRIPT"
 echo "Loaded launchd job '$PLIST_LABEL' (runs daily at $HOUR:$(printf '%02d' "$MINUTE"))"
