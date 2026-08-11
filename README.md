@@ -1,6 +1,6 @@
 # claude-backup
 
-[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.3.0)
+[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.3.1)
 [![ShellCheck](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/jchan023/claude-backup/actions/workflows/shellcheck.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assets License: MIT](https://img.shields.io/badge/Assets-MIT-blue.svg)](LICENSE)
@@ -70,6 +70,7 @@ whether to back them up at all.
 - [Uninstall](#uninstall)
 - [Logs](#logs)
 - [Failure alerts](#failure-alerts)
+- [Troubleshooting](#troubleshooting)
 - [Changelog](CHANGELOG.md)
 
 ## Install
@@ -335,3 +336,31 @@ CLAUDE_BACKUP_NOTIFY=0 ./install.sh
 Notifications appear from "Script Editor" in Notification Center — if
 they don't show up, check System Settings → Notifications → Script
 Editor.
+
+## Troubleshooting
+
+### "Claude Backup Failed" notification, log shows `Operation not permitted`
+
+```
+rsync(1234): error: /Users/you/.../latest/desktop/: open: Operation not permitted
+```
+
+This happens when `CLAUDE_BACKUP_DEST` resolves into a TCC-protected
+location — notably anything under `~/Library/CloudStorage/`, which
+several cloud-sync providers' top-level folders can be a symlink into on
+modern macOS. Check with `readlink` on your `CLAUDE_BACKUP_DEST` path if
+you're not sure. The backup runs as a background `launchd` agent
+invoking `/bin/bash` directly, and background agents don't automatically
+inherit the Full Disk Access an interactive Terminal session has — so
+this can pass every time you test it by hand and still fail on the
+actual scheduled run, since those go through different permission
+contexts.
+
+Fix: **System Settings → Privacy & Security → Full Disk Access** → click
+**+** → press **Cmd+Shift+G** → type `/bin/bash` → add it → toggle it on.
+Then trigger a run to confirm:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.local.claude-desktop-backup
+tail -5 ~/Library/Logs/claude-desktop-backup.log
+```

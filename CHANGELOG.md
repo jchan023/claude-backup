@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-11
+
+### Added
+
+- README **Troubleshooting** section covering a real failure: backups
+  to a `~/Library/CloudStorage/`-backed destination (several cloud-sync
+  providers' top-level folders can resolve there) can start failing with
+  `rsync: ... open: Operation not permitted` because the backup runs as
+  a background `launchd` agent, which doesn't automatically inherit the
+  Full Disk Access an interactive Terminal session has — even though
+  running the identical command by hand works fine, which is what makes
+  it look like it "randomly" breaks. Documents the Full Disk Access fix
+  and how to verify it with `launchctl kickstart`.
+
 ## [1.3.0] - 2026-08-10
 
 ### Added
@@ -161,7 +175,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/jchan023/claude-backup/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/jchan023/claude-backup/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/jchan023/claude-backup/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/jchan023/claude-backup/compare/v1.1.1...v1.1.2
