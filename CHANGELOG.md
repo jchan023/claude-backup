@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-08-11
+
+### Fixed
+
+- Snapshot pruning's retry/`WARNING` logic (added in 1.0.1, hardened
+  further since) was unreachable whenever `rm -rf` actually failed. That
+  loop runs inside a pipeline subshell, so under `set -e` a failing
+  `rm -rf` aborted the whole script immediately via the generic ERR trap
+  — before ever reaching the `if [ -d "$old" ]` retry/log logic meant to
+  handle exactly that case. Only surfaced now because earlier tests of
+  that path (`chflags`/`chmod` tricks meant to force a real removal
+  failure) happened not to actually block `rm -rf` in whatever sandbox
+  they ran in — this time one did, and the bug showed up as an
+  unexpected non-zero exit instead of the intended `WARNING` log line.
+  Fixed with `|| true` on both `rm -rf` attempts so a real failure falls
+  through to the retry/warning logic instead of killing the script.
+  Reverified: with `CLAUDE_BACKUP_NOTIFY=1` a real notification fires on
+  the forced failure (confirmed visually); with `=0` it's suppressed;
+  either way the script now reaches `backup complete` instead of exiting
+  early.
+
 ## [1.3.2] - 2026-08-11
 
 ### Security
@@ -202,7 +223,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.3.3...HEAD
+[1.3.3]: https://github.com/jchan023/claude-backup/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/jchan023/claude-backup/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/jchan023/claude-backup/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/jchan023/claude-backup/compare/v1.2.0...v1.3.0

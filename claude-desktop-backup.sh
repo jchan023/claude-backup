@@ -83,10 +83,15 @@ cp -al "$LATEST" "$TODAY" 2>>"$LOG" || cp -a "$LATEST" "$TODAY" >> "$LOG" 2>&1
 # rm -rf can race with the sync daemon holding a file handle and leave an
 # empty directory behind, so retry once and verify before declaring success.
 find "$SNAPSHOTS" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((KEEP + 1)) | while read -r old; do
-  rm -rf "$old"
+  # `|| true` on both attempts: under `set -e`, a genuinely failing
+  # rm -rf here (this loop runs in a pipeline subshell) would abort the
+  # whole script immediately via the generic ERR trap, before ever
+  # reaching the retry/WARNING logic below that's specifically meant to
+  # handle this case.
+  rm -rf "$old" || true
   if [ -d "$old" ]; then
     sleep 2
-    rm -rf "$old"
+    rm -rf "$old" || true
   fi
   if [ -d "$old" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') WARNING: failed to fully remove $old (will retry next run)" >> "$LOG"
