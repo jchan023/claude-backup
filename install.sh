@@ -1,15 +1,9 @@
 #!/bin/bash
-# Installs claude-desktop-backup.sh, wraps it in a minimal .app bundle, and
-# installs a launchd job that runs the wrapper daily.
+# Installs claude-desktop-backup.sh and a launchd job that runs it daily.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST_SCRIPT="$HOME/Library/Scripts/claude-desktop-backup.sh"
-APP_DIR="$HOME/Library/Application Support/ClaudeBackup.app"
-# osacompile always names its compiled binary "applet" — not
-# configurable, and not worth renaming after the fact.
-APP_EXECUTABLE="$APP_DIR/Contents/MacOS/applet"
-BUNDLE_ID="com.local.claude-desktop-backup"
 PLIST_LABEL="com.local.claude-desktop-backup"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 LOG="$HOME/Library/Logs/claude-desktop-backup.log"
@@ -40,61 +34,18 @@ for n in "$HOUR" "$MINUTE" "$KEEP" "$MAX_LOG_LINES" "$NOTIFY" "$INCLUDE_CREDENTI
   esac
 done
 
-APP_EXECUTABLE_ESC="$(xml_escape "$APP_EXECUTABLE")"
 DEST_ESC="$(xml_escape "$DEST")"
+DEST_SCRIPT_ESC="$(xml_escape "$DEST_SCRIPT")"
 LOG_ESC="$(xml_escape "$LOG")"
+
+# Clean up the wrapper .app from 1.5.0/1.5.1, if present — that approach
+# didn't actually scope Full Disk Access (see CHANGELOG.md) and was
+# reverted; ProgramArguments below points at /bin/bash directly again.
+rm -rf "$HOME/Library/Application Support/ClaudeBackup.app"
 
 mkdir -p "$HOME/Library/Scripts" "$HOME/Library/LaunchAgents" "$(dirname "$LOG")"
 cp "$SCRIPT_DIR/claude-desktop-backup.sh" "$DEST_SCRIPT"
 chmod +x "$DEST_SCRIPT"
-
-# Wrap the script in a minimal .app bundle instead of pointing the launchd
-# job at the shared system /bin/bash directly, so Full Disk Access can be
-# granted to this one app specifically instead of to /bin/bash
-# system-wide (which every other shell script on the machine would
-# otherwise also inherit). See README.md's Troubleshooting section.
-#
-# This MUST be a real compiled binary, not a script with a #!/bin/bash
-# shebang — confirmed the hard way: a shebang "executable" causes the
-# kernel to exec /bin/bash as the actual running process, and TCC's
-# Full Disk Access check is keyed to that process, not to the bundle
-# nominally wrapping it. A shebang wrapper creates no TCC identity of
-# its own at all and silently piggybacks on whatever grant /bin/bash
-# already has — verified directly against the TCC database. osacompile
-# (ships with macOS, no Xcode needed) produces an actual Mach-O binary
-# that gets its own distinct, independently-evaluated TCC identity —
-# also verified directly: an ungranted osacompile app gets a real
-# (denied) entry in the TCC database, unlike the shebang version.
-rm -rf "$APP_DIR"
-APPLESCRIPT_SRC="$(mktemp)"
-trap 'rm -f "$APPLESCRIPT_SRC"' EXIT
-printf 'do shell script "%s"\n' "'${DEST_SCRIPT}'" > "$APPLESCRIPT_SRC"
-osacompile -o "$APP_DIR" "$APPLESCRIPT_SRC"
-rm -f "$APPLESCRIPT_SRC"
-trap - EXIT
-
-# osacompile doesn't set a CFBundleIdentifier by default — without one,
-# TCC has no stable identity to remember a grant against between runs.
-plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" "$APP_DIR/Contents/Info.plist"
-plutil -replace LSUIElement -bool true "$APP_DIR/Contents/Info.plist"
-
-# Editing Info.plist after osacompile's own signing invalidates that
-# signature, so re-sign. Ad hoc (no paid Developer ID needed — this
-# never leaves the machine it's built on) just to give the bundle a
-# stable identity and avoid a Gatekeeper first-launch decision.
-if command -v codesign >/dev/null 2>&1; then
-  codesign --force --sign - "$APP_DIR" 2>/dev/null || echo "Warning: codesign failed; continuing with an unsigned bundle." >&2
-else
-  echo "Warning: codesign not found; continuing with an unsigned bundle." >&2
-fi
-
-# Register with Launch Services so System Settings' Full Disk Access
-# file picker recognizes it properly (name/icon) rather than as a bare
-# unknown bundle.
-LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-if [ -x "$LSREGISTER" ]; then
-  "$LSREGISTER" -f "$APP_DIR" >/dev/null 2>&1 || true
-fi
 
 cat > "$PLIST_PATH" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -105,7 +56,8 @@ cat > "$PLIST_PATH" <<PLIST
     <string>$PLIST_LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$APP_EXECUTABLE_ESC</string>
+        <string>/bin/bash</string>
+        <string>$DEST_SCRIPT_ESC</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
@@ -151,7 +103,6 @@ if ! launchctl list "$PLIST_LABEL" >/dev/null 2>&1; then
 fi
 
 echo "Installed $DEST_SCRIPT"
-echo "Wrapper app: $APP_DIR"
 echo "Loaded launchd job '$PLIST_LABEL' (runs daily at $HOUR:$(printf '%02d' "$MINUTE"))"
 echo "Backups go to: $DEST (keeping $KEEP snapshots)"
 if [ "$INCLUDE_CREDENTIALS" = "1" ]; then
@@ -160,8 +111,3 @@ else
   echo "Credentials: excluded"
 fi
 echo "Logs: $LOG"
-echo ""
-echo "If your backup destination is under ~/Library/CloudStorage/ (Google"
-echo "Drive, OneDrive, iCloud Drive, or similar), grant Full Disk Access to:"
-echo "  $APP_DIR"
-echo "System Settings -> Privacy & Security -> Full Disk Access -> + -> Cmd+Shift+G -> paste that path."

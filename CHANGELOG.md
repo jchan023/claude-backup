@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-08-11
+
+### Removed
+
+- **Reverted the wrapper-app approach entirely — 1.5.1's fix was also
+  flawed, for a different reason than 1.5.0's.** 1.5.1 correctly used a
+  real compiled binary (via `osacompile`) so the *wrapper itself* got
+  its own distinct TCC identity — verified at the time by checking the
+  TCC database and seeing a genuine denied entry for it. What wasn't
+  re-verified: this project's actual payload is a **bash script**
+  (`claude-desktop-backup.sh`), and the wrapper's `do shell script`
+  ultimately still execs that script via its own `#!/bin/bash` shebang.
+  Once `/bin/bash` appears anywhere in the chain — even several layers
+  down, invoked from inside a genuinely distinct compiled binary — Full
+  Disk Access checks fall back to `/bin/bash`'s own pre-existing grant
+  instead of the wrapper's. Confirmed directly: ran the actual backup
+  script through the compiled wrapper against the real protected path,
+  with a bundle identity that had never been granted anything — it
+  succeeded, and no new TCC entry was created. Same practical result as
+  1.5.0 (no real scoping), via a different mechanism.
+- The 1.5.1 "proof" (a bare `ls` command run through the same wrapper
+  correctly got denied and created a real TCC entry) was real but not
+  representative — `ls` never routes through `/bin/bash`, so it never
+  exercised the actual failure mode. Confirmed that specifically: the
+  same `ls` command wrapped in `/bin/bash -c "..."` instead reverts to
+  the exact same silent-success-via-/bin/bash's-grant behavior.
+- **Conclusion:** genuinely scoping Full Disk Access away from
+  `/bin/bash` isn't achievable for a tool whose actual file-copy logic
+  is a bash script shelling out to `rsync`/`cp`, without rewriting that
+  logic in a compiled language instead — a much bigger undertaking than
+  a wrapper, and out of scope here. Reverted `install.sh`/`uninstall.sh`
+  to the pre-wrapper state (plain `/bin/bash` in `ProgramArguments`,
+  everything else from 1.4.0–1.5.0 kept: XML escaping, integer
+  validation, actual-registration verification, the credentials toggle,
+  etc.), removed the wrapper-specific test assertions, and rewrote the
+  README's Full Disk Access Troubleshooting entry to document what was
+  tried, why it doesn't work, and that granting `/bin/bash` directly —
+  a broad, system-wide grant — is the real, working fix. If you
+  installed 1.5.0 or 1.5.1, re-run `install.sh` to remove the wrapper
+  and revert your `launchd` job to invoking `/bin/bash` directly.
+
 ## [1.5.1] - 2026-08-11
 
 ### Fixed

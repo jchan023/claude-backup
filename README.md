@@ -356,22 +356,29 @@ it by hand and still fail on the actual scheduled run, since those go
 through different permission contexts.
 
 Fix: **System Settings → Privacy & Security → Full Disk Access** → click
-**+** → press **Cmd+Shift+G** → paste this path → add it → toggle it on:
+**+** → press **Cmd+Shift+G** → type `/bin/bash` → add it → toggle it on.
 
-```
-~/Library/Application Support/ClaudeBackup.app
-```
+**Know what this actually grants first:** Full Disk Access is scoped to
+the executable (`/bin/bash`), not to this one script — every shell
+script on the system that happens to invoke `/bin/bash` (the vast
+majority of them, since it's the default interpreter) inherits it too,
+regardless of what launched it. This is a broad, system-wide grant, not
+something scoped to just this backup.
 
-`install.sh` wraps the backup script in this minimal `.app` bundle and
-points the launchd job at it, specifically so the Full Disk Access grant
-is scoped to just this one app — not to `/bin/bash` system-wide, which
-every other shell script on the machine would otherwise also inherit
-(there's no way to avoid *some* per-machine grant when writing into a
-TCC-protected cloud folder from a background process — this only
-controls what that grant actually covers). If you installed before this
-wrapper existed, re-run `install.sh` to pick it up, then grant Full Disk
-Access to the app path above instead of `/bin/bash` (you can remove the
-old `/bin/bash` grant once the app path is confirmed working).
+We looked hard for a way to scope this down to just the backup script
+(wrapping it in a signed `.app` bundle, on the theory that Full Disk
+Access could then be granted to just that app) and confirmed, by
+directly inspecting `/Library/Application Support/com.apple.TCC/TCC.db`
+before and after real runs, that it doesn't work: this backup's payload
+is itself a bash script, and once `/bin/bash` appears anywhere in the
+process chain performing the actual file access — even several layers
+down, invoked from inside a genuinely distinct compiled binary — Full
+Disk Access falls back to checking `/bin/bash`'s own grant rather than
+the wrapper's. The only way to actually scope this down would be
+rewriting the file-copy logic itself in a compiled language instead of
+shelling out to `rsync`/`cp` from bash — a much bigger undertaking than
+a wrapper, and not something this project currently does. Granting
+`/bin/bash` Full Disk Access directly is the real, working fix.
 
 Once granted, trigger a run to confirm:
 
