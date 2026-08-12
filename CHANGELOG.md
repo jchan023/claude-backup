@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-08-12
+
+### Fixed
+
+- **1.5.3's fix for #1 introduced its own regression.** The `cp -a`
+  fallback added there can itself exit nonzero on the same class of
+  `chflags` error (Box Drive reported this happening on both `cp -al`
+  *and* the `cp -a` fallback, for symlinks under `~/.claude/skills/`)
+  while still successfully copying everything else. Left unguarded,
+  that nonzero exit under `set -e` aborted the whole script — silently
+  skipping both the `backup complete` log line and snapshot pruning
+  (which runs after this point). The actual file data landed correctly
+  either way; only the script's own success reporting and pruning were
+  affected. Fixed by guarding the fallback with `|| true` (matching how
+  pruning's own `rm -rf` calls are already guarded, since v1.3.3), plus
+  a safety net: if `$TODAY` still doesn't exist after the fallback
+  (a *genuine* total failure, not just a benign per-file `chflags`
+  error), log a `WARNING` and fire a notification instead of silently
+  doing nothing.
+
+  Box Drive's specific `chflags`-on-symlink failure for a full (non-hardlink)
+  copy isn't reproducible on local APFS — confirmed directly: a
+  `chflags uchg`'d file makes `cp -al` fail (same inode, can't re-flag
+  something already immutable) but a fresh `cp -a` copy of it succeeds
+  (the new file isn't immutable yet). Verified the actual guard logic
+  instead with a mock `cp` on `PATH` that does a real copy and then
+  deliberately exits 1 for the `-a` case — testing the real script's
+  control flow independent of a filesystem quirk that can't be
+  triggered here. Confirmed both new tests fail against the actual
+  1.5.3 code and pass against the fix.
+
+  Reported in [#2](https://github.com/jchan023/claude-backup/issues/2).
+
 ## [1.5.3] - 2026-08-12
 
 ### Fixed
@@ -403,7 +436,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.3...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.4...HEAD
+[1.5.4]: https://github.com/jchan023/claude-backup/compare/v1.5.3...v1.5.4
 [1.5.3]: https://github.com/jchan023/claude-backup/compare/v1.5.2...v1.5.3
 [1.5.2]: https://github.com/jchan023/claude-backup/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/jchan023/claude-backup/compare/v1.5.0...v1.5.1

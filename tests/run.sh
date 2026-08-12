@@ -151,6 +151,86 @@ chflags nouchg "$TESTDIR/latest/cli/settings.json" 2>/dev/null
 chflags nouchg "$TODAY/cli/settings.json" 2>/dev/null
 rm -rf "$TESTDIR"
 
+echo "== claude-desktop-backup.sh: cp -a fallback failing doesn't abort the whole script =="
+# Regression test for a follow-up bug report: the fix above introduced a
+# new problem. cp -a itself can also exit nonzero on the same class of
+# chflags error (Box Drive reported this happening on both cp -al *and*
+# the cp -a fallback for symlinks under ~/.claude/skills/) while still
+# successfully copying everything else. Left unguarded, that exit under
+# `set -e` aborted the whole script — silently skipping both the
+# "backup complete" log line and snapshot pruning (which runs after
+# this point).
+#
+# Box Drive's specific chflags-on-symlink failure for a *full* (non-
+# hardlink) copy isn't reproducible on a local APFS volume — confirmed
+# directly: a chflags-uchg'd file makes cp -al fail (same inode, can't
+# re-flag something already immutable) but a fresh cp -a copy of it
+# succeeds (the new file isn't immutable yet, so flagging it works
+# fine). So this uses a mock `cp` on PATH instead: real behavior for
+# `-al`, but the `-a` fallback does a real copy and then deliberately
+# exits 1 — testing the actual guard logic in the real script,
+# independent of a filesystem quirk that can't be triggered here.
+TESTDIR="$(mktemp -d)"
+mkdir -p "$TESTDIR/latest/desktop" "$TESTDIR/latest/cli/skills" "$TESTDIR/bin"
+echo "d1" > "$TESTDIR/latest/desktop/file.txt"
+echo "skill" > "$TESTDIR/latest/cli/skills/SKILL.md"
+chflags uchg "$TESTDIR/latest/cli/skills/SKILL.md"
+mkdir -p "$TESTDIR/snapshots"
+cat > "$TESTDIR/bin/cp" <<'MOCK'
+#!/bin/bash
+if [[ "$1" == "-al" ]]; then
+  exec /bin/cp "$@"
+elif [[ "$1" == "-a" ]]; then
+  /bin/cp "$@"
+  exit 1
+fi
+exec /bin/cp "$@"
+MOCK
+chmod +x "$TESTDIR/bin/cp"
+# shellcheck disable=SC2034
+LATEST="$TESTDIR/latest"
+TODAY="$TESTDIR/snapshots/2026-08-12"
+LOG="$TESTDIR/log.txt"
+touch "$LOG"
+# shellcheck disable=SC2329 # invoked indirectly by the eval'd SNAPSHOT_SNIPPET below
+notify() { :; }
+# shellcheck disable=SC2016 # single-quoted intentionally — matching the literal "$TODAY" text in the source file, not expanding it
+SNAPSHOT_SNIPPET="$(sed -n '/^rm -rf "\$TODAY"$/,/^fi$/p' "$REPO_DIR/claude-desktop-backup.sh")"
+( PATH="$TESTDIR/bin:$PATH" eval "$SNAPSHOT_SNIPPET" )
+assert_eq "$?" "0" "script doesn't abort when the cp -a fallback itself exits nonzero"
+assert_file "$TODAY/desktop/file.txt" "correctly-copied content still lands despite the fallback's nonzero exit"
+chflags nouchg "$TESTDIR/latest/cli/skills/SKILL.md" 2>/dev/null
+chflags nouchg "$TODAY/cli/skills/SKILL.md" 2>/dev/null
+rm -rf "$TESTDIR"
+
+echo "== claude-desktop-backup.sh: total snapshot failure logs a WARNING and notifies =="
+TESTDIR="$(mktemp -d)"
+mkdir -p "$TESTDIR/latest/desktop" "$TESTDIR/bin"
+echo "d1" > "$TESTDIR/latest/desktop/file.txt"
+mkdir -p "$TESTDIR/snapshots"
+cat > "$TESTDIR/bin/cp" <<'MOCK'
+#!/bin/bash
+exit 1
+MOCK
+chmod +x "$TESTDIR/bin/cp"
+# shellcheck disable=SC2034
+LATEST="$TESTDIR/latest"
+TODAY="$TESTDIR/snapshots/2026-08-12"
+LOG="$TESTDIR/log.txt"
+touch "$LOG"
+NOTIFY_LOG="$TESTDIR/notify.log"
+notify() { echo "$1|$2" >> "$NOTIFY_LOG"; }
+# shellcheck disable=SC2016 # single-quoted intentionally — matching the literal "$TODAY" text in the source file, not expanding it
+SNAPSHOT_SNIPPET="$(sed -n '/^rm -rf "\$TODAY"$/,/^fi$/p' "$REPO_DIR/claude-desktop-backup.sh")"
+( PATH="$TESTDIR/bin:$PATH" eval "$SNAPSHOT_SNIPPET" )
+assert_eq "$?" "0" "script doesn't abort even when the snapshot fails completely"
+if grep -q "WARNING: snapshot creation failed entirely" "$LOG"; then
+  pass "total snapshot failure logs a WARNING"
+else
+  fail "total snapshot failure logs a WARNING (log: $(cat "$LOG"))"
+fi
+rm -rf "$TESTDIR"
+
 echo "== restore.sh: --list shows available dates =="
 # Captured into a variable and matched with bash's own [[ == *pattern* ]]
 # rather than piped live into `grep -q`: grep -q exits after its first

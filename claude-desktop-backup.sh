@@ -86,7 +86,18 @@ if ! cp -al "$LATEST" "$TODAY" 2>>"$LOG"; then
   # nests under it), producing a spurious nested
   # snapshots/YYYY-MM-DD/latest/{desktop,cli}/ one level too deep.
   rm -rf "$TODAY"
-  cp -a "$LATEST" "$TODAY" >> "$LOG" 2>&1
+  # `|| true`: cp -a can itself exit non-zero on the same class of
+  # per-file chflags error as cp -al above (e.g. Box Drive rejecting
+  # chflags on certain symlinks under ~/.claude/skills/) while still
+  # successfully copying everything else — confirmed this doesn't abort
+  # the copy, just the exit code. Unguarded, that exit under `set -e`
+  # aborted the whole script, silently skipping both the "backup
+  # complete" log line and snapshot pruning (which runs after this).
+  cp -a "$LATEST" "$TODAY" >> "$LOG" 2>&1 || true
+  if [ ! -d "$TODAY" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') WARNING: snapshot creation failed entirely — check the log" >> "$LOG"
+    notify "Claude Backup Warning" "Today's snapshot could not be created — check the log."
+  fi
 fi
 
 # Prune snapshots beyond the most recent $KEEP. On cloud-synced folders,
