@@ -77,7 +77,17 @@ fi
 # Dated snapshot of today's backup (hardlinked, so it costs no extra space
 # unless a file actually changed).
 rm -rf "$TODAY"
-cp -al "$LATEST" "$TODAY" 2>>"$LOG" || cp -a "$LATEST" "$TODAY" >> "$LOG" 2>&1
+if ! cp -al "$LATEST" "$TODAY" 2>>"$LOG"; then
+  # cp -al can fail partway through (e.g. Box Drive's virtual filesystem
+  # rejects chflags on certain symlinks) after already creating $TODAY
+  # with partial content. If the fallback below ran against that
+  # leftover directory, cp -a would copy $LATEST *into* it instead of
+  # replacing it (cp's own behavior: copying into an existing directory
+  # nests under it), producing a spurious nested
+  # snapshots/YYYY-MM-DD/latest/{desktop,cli}/ one level too deep.
+  rm -rf "$TODAY"
+  cp -a "$LATEST" "$TODAY" >> "$LOG" 2>&1
+fi
 
 # Prune snapshots beyond the most recent $KEEP. On cloud-synced folders,
 # rm -rf can race with the sync daemon holding a file handle and leave an

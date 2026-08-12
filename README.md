@@ -1,6 +1,6 @@
 # claude-backup
 
-[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.5.1)
+[![Release](https://img.shields.io/github/v/release/jchan023/claude-backup)](https://github.com/jchan023/claude-backup/releases/tag/v1.5.3)
 [![CI](https://github.com/jchan023/claude-backup/actions/workflows/ci.yml/badge.svg)](https://github.com/jchan023/claude-backup/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assets License: MIT](https://img.shields.io/badge/Assets-MIT-blue.svg)](LICENSE)

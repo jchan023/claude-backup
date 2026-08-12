@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-08-12
+
+### Fixed
+
+- Snapshot creation could leave a stray nested
+  `snapshots/YYYY-MM-DD/latest/{desktop,cli}/` one level deeper than
+  intended, duplicating that day's backup inside itself. If `cp -al`
+  failed partway through (reported on Box Drive, whose virtual
+  filesystem rejects `chflags` on certain symlinks — e.g. skills
+  installed as symlinks to external repos under `~/.claude/skills/`) it
+  had already created `$TODAY` with partial content before erroring,
+  and the `cp -a` fallback then copied `$LATEST` *into* that
+  already-existing directory instead of replacing it — that's just how
+  `cp` behaves when its destination already exists. Not
+  data-destroying (the correctly-placed top-level `desktop/`/`cli/`
+  data was still there too), but recurred on every run and wasted space
+  silently. Fixed by `rm -rf`ing `$TODAY` again before the fallback
+  attempt, so it starts clean instead of nesting into `cp -al`'s partial
+  output. Added a regression test that extracts the actual
+  snapshot-creation lines from the real script and runs them in
+  isolation against a hand-built `$LATEST`/`$TODAY` with an
+  immutable-flagged file forcing the same partial-failure condition —
+  confirmed it reproduces the exact nested structure against the old
+  code and stays clean against the fix.
+
+  Reported in [#1](https://github.com/jchan023/claude-backup/issues/1).
+
 ## [1.5.2] - 2026-08-11
 
 ### Removed
@@ -376,7 +403,9 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.3...HEAD
+[1.5.3]: https://github.com/jchan023/claude-backup/compare/v1.5.2...v1.5.3
+[1.5.2]: https://github.com/jchan023/claude-backup/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/jchan023/claude-backup/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/jchan023/claude-backup/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/jchan023/claude-backup/compare/v1.3.3...v1.4.0

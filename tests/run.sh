@@ -106,6 +106,51 @@ mkdir -p "$DEST6/snapshots/2020-01-01" "$DEST6/snapshots/2020-01-02" "$DEST6/sna
 SNAP_COUNT=$(find "$DEST6/snapshots" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
 assert_eq "$SNAP_COUNT" "2" "pruning keeps exactly CLAUDE_BACKUP_KEEP snapshots"
 
+echo "== claude-desktop-backup.sh: cp -al failing partway doesn't nest the fallback =="
+# Regression test for a real bug report: if cp -al fails partway through
+# (e.g. Box Drive can't chflags certain symlinks), it can leave $TODAY
+# already existing as a partially-populated directory. The cp -a
+# fallback then copies $LATEST *into* that existing directory instead of
+# replacing it (that's just how cp works when the destination already
+# exists), producing a spurious nested snapshots/YYYY-MM-DD/latest/
+# instead of snapshots/YYYY-MM-DD/{desktop,cli} directly.
+#
+# Tested by extracting the actual snapshot-creation lines straight out
+# of claude-desktop-backup.sh (so this can't silently drift from the
+# real code) and running just that fragment against a hand-built
+# $LATEST/$TODAY, rather than the whole script. Driving this through a
+# full script run doesn't work: chmod 000 on a latest/ subdirectory also
+# blocks the *earlier* rsync sync-to-latest step, aborting the script via
+# set -e before the buggy code is ever reached; and running the full
+# script twice to force a second-run failure instead trips over rsync
+# and rm -rf also getting blocked by the same immutable flag on the
+# *first* run's already-created snapshot. Isolating just the two lines
+# under test sidesteps all of that.
+TESTDIR="$(mktemp -d)"
+mkdir -p "$TESTDIR/latest/desktop" "$TESTDIR/latest/cli"
+echo "d1" > "$TESTDIR/latest/desktop/file.txt"
+echo "c1" > "$TESTDIR/latest/cli/settings.json"
+chflags uchg "$TESTDIR/latest/cli/settings.json"
+mkdir -p "$TESTDIR/snapshots"
+# shellcheck disable=SC2034 # used inside the eval'd SNAPSHOT_SNIPPET below, not visible to shellcheck statically
+LATEST="$TESTDIR/latest"
+TODAY="$TESTDIR/snapshots/2026-08-12"
+LOG="$TESTDIR/log.txt"
+touch "$LOG"
+# shellcheck disable=SC2016 # single-quoted intentionally — matching the literal "$TODAY" text in the source file, not expanding it
+SNAPSHOT_SNIPPET="$(sed -n '/^rm -rf "\$TODAY"$/,/^fi$/p' "$REPO_DIR/claude-desktop-backup.sh")"
+( eval "$SNAPSHOT_SNIPPET" ) 2>/dev/null
+NESTED=$(find "$TESTDIR/snapshots" -mindepth 1 -maxdepth 3 -type d -name "latest" 2>/dev/null)
+if [ -z "$NESTED" ]; then
+  pass "no spurious nested snapshots/YYYY-MM-DD/latest/ after a partial cp -al failure"
+else
+  fail "no spurious nested snapshots/YYYY-MM-DD/latest/ after a partial cp -al failure (found: $NESTED)"
+fi
+assert_file "$TODAY/desktop/file.txt" "snapshot content still lands at the correct top level despite the failure"
+chflags nouchg "$TESTDIR/latest/cli/settings.json" 2>/dev/null
+chflags nouchg "$TODAY/cli/settings.json" 2>/dev/null
+rm -rf "$TESTDIR"
+
 echo "== restore.sh: --list shows available dates =="
 # Captured into a variable and matched with bash's own [[ == *pattern* ]]
 # rather than piped live into `grep -q`: grep -q exits after its first
