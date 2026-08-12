@@ -2,7 +2,9 @@
 # Removes the launchd job and installed script. Does not touch existing backups.
 set -euo pipefail
 
-PLIST_LABEL="com.local.claude-desktop-backup"
+# Must match install.sh's default/override so uninstall targets the
+# same job it installed — see install.sh for why this is overridable.
+PLIST_LABEL="${CLAUDE_BACKUP_PLIST_LABEL:-com.local.claude-desktop-backup}"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 DEST_SCRIPT="$HOME/Library/Scripts/claude-desktop-backup.sh"
 

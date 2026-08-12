@@ -4,7 +4,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST_SCRIPT="$HOME/Library/Scripts/claude-desktop-backup.sh"
-PLIST_LABEL="com.local.claude-desktop-backup"
+# Overridable so tests/run.sh can use a unique label — launchctl
+# load/unload resolve jobs by Label within the whole gui/<uid> launchd
+# domain, which isn't scoped by $HOME at all. A test install using the
+# same default label as a real production install would silently take
+# the real job down when the test uninstalls, even though every file
+# path involved is otherwise correctly confined to a fake $HOME.
+PLIST_LABEL="${CLAUDE_BACKUP_PLIST_LABEL:-com.local.claude-desktop-backup}"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 LOG="$HOME/Library/Logs/claude-desktop-backup.log"
 HOUR="${CLAUDE_BACKUP_HOUR:-9}"

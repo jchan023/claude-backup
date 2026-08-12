@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.5] - 2026-08-12
+
+### Fixed
+
+- **`tests/run.sh` could silently take down a real production
+  `launchd` job.** `launchctl load`/`unload` resolve jobs by `Label`
+  within the whole `gui/<uid>` domain, which isn't scoped by `$HOME` at
+  all — only file paths are. Every test install used `install.sh`'s
+  fixed default `Label` (`com.local.claude-desktop-backup`), so on a
+  machine that also has the real thing installed under that same
+  default label, running the test suite's uninstall test would unload
+  the *real* job as a side effect, even though every file path involved
+  was otherwise correctly confined to a fake `$HOME` — the test's own
+  assertions (checking the fake-`$HOME` plist/script are gone) still
+  passed, with no indication anything outside the sandbox had happened.
+  Reproduced directly: registered a throwaway real job under that
+  label, ran the suite, confirmed it vanished. Fixed by adding an
+  optional `CLAUDE_BACKUP_PLIST_LABEL` override to `install.sh`/
+  `uninstall.sh` (defaults to the same fixed label for real installs,
+  unchanged) and having `tests/run.sh` export a label unique to that
+  test run (`com.local.claude-backup-tests-$$`) for every install it
+  creates — collision-proof by construction, not by convention.
+  Reverified the same repro: the throwaway real job now survives a full
+  test run.
+
+  Reported in [#3](https://github.com/jchan023/claude-backup/issues/3).
+
 ## [1.5.4] - 2026-08-12
 
 ### Fixed
@@ -436,7 +463,8 @@ Initial release.
 - ShellCheck SC2012: replaced `ls` with `find` when listing snapshot
   directories for pruning, to handle filenames more robustly.
 
-[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.4...HEAD
+[Unreleased]: https://github.com/jchan023/claude-backup/compare/v1.5.5...HEAD
+[1.5.5]: https://github.com/jchan023/claude-backup/compare/v1.5.4...v1.5.5
 [1.5.4]: https://github.com/jchan023/claude-backup/compare/v1.5.3...v1.5.4
 [1.5.3]: https://github.com/jchan023/claude-backup/compare/v1.5.2...v1.5.3
 [1.5.2]: https://github.com/jchan023/claude-backup/compare/v1.5.1...v1.5.2

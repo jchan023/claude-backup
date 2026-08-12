@@ -15,6 +15,17 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FAILURES=0
 PASS_COUNT=0
 
+# launchctl load/unload resolve jobs by Label within the whole gui/<uid>
+# launchd domain, which isn't scoped by $HOME at all — install.sh's
+# default Label is a fixed constant. A test install using that same
+# default label as a real, already-installed production job would
+# silently take the real job down the moment the test uninstalls,
+# even though every file path involved is otherwise correctly confined
+# to a fake $HOME. Use a label that can never collide with a real
+# install (unique per test run), and export it so every install.sh/
+# uninstall.sh invocation below picks it up via CLAUDE_BACKUP_PLIST_LABEL.
+export CLAUDE_BACKUP_PLIST_LABEL="com.local.claude-backup-tests-$$"
+
 pass() { PASS_COUNT=$((PASS_COUNT + 1)); echo "  ok: $1"; }
 fail() { FAILURES=$((FAILURES + 1)); echo "  FAIL: $1"; }
 
@@ -49,16 +60,16 @@ new_fake_home() {
 }
 
 cleanup_job() {
-  launchctl unload "$1/Library/LaunchAgents/com.local.claude-desktop-backup.plist" >/dev/null 2>&1 || true
+  launchctl unload "$1/Library/LaunchAgents/$CLAUDE_BACKUP_PLIST_LABEL.plist" >/dev/null 2>&1 || true
 }
 
 echo "== install.sh: basic install =="
 HOME1="$(new_fake_home)"
 ( cd "$REPO_DIR" && HOME="$HOME1" ./install.sh >/dev/null )
 assert_eq "$?" "0" "install.sh exits 0"
-plutil -lint "$HOME1/Library/LaunchAgents/com.local.claude-desktop-backup.plist" >/dev/null 2>&1
+plutil -lint "$HOME1/Library/LaunchAgents/$CLAUDE_BACKUP_PLIST_LABEL.plist" >/dev/null 2>&1
 assert_eq "$?" "0" "generated plist is valid XML"
-launchctl list com.local.claude-desktop-backup >/dev/null 2>&1
+launchctl list "$CLAUDE_BACKUP_PLIST_LABEL" >/dev/null 2>&1
 assert_eq "$?" "0" "launchd job is actually registered (not just claimed)"
 assert_file "$HOME1/Library/Scripts/claude-desktop-backup.sh" "backup script installed"
 cleanup_job "$HOME1"
@@ -73,7 +84,7 @@ rm -rf "$HOME2"
 echo "== install.sh: XML-escapes special characters in CLAUDE_BACKUP_DEST =="
 HOME3="$(new_fake_home)"
 ( cd "$REPO_DIR" && HOME="$HOME3" CLAUDE_BACKUP_DEST="$HOME3/Back & <ups>" ./install.sh >/dev/null )
-plutil -lint "$HOME3/Library/LaunchAgents/com.local.claude-desktop-backup.plist" >/dev/null 2>&1
+plutil -lint "$HOME3/Library/LaunchAgents/$CLAUDE_BACKUP_PLIST_LABEL.plist" >/dev/null 2>&1
 assert_eq "$?" "0" "plist stays valid XML with & < > in CLAUDE_BACKUP_DEST"
 cleanup_job "$HOME3"
 rm -rf "$HOME3"
@@ -273,7 +284,7 @@ HOME7="$(new_fake_home)"
 ( cd "$REPO_DIR" && HOME="$HOME7" CLAUDE_BACKUP_DEST="$HOME7/Backups" ./install.sh >/dev/null )
 ( cd "$REPO_DIR" && HOME="$HOME7" "$HOME7/Library/Scripts/claude-desktop-backup.sh" >/dev/null )
 ( cd "$REPO_DIR" && HOME="$HOME7" ./uninstall.sh >/dev/null )
-if ! launchctl list com.local.claude-desktop-backup >/dev/null 2>&1; then
+if ! launchctl list "$CLAUDE_BACKUP_PLIST_LABEL" >/dev/null 2>&1; then
   pass "uninstall.sh actually removes the launchd job"
 else
   fail "uninstall.sh actually removes the launchd job (still registered)"

@@ -39,6 +39,17 @@ relevant lines from `~/Library/Logs/claude-desktop-backup.log`.
    HOME="$FAKE_HOME" ./uninstall.sh
    rm -rf "$FAKE_HOME"
    ```
+   A fake `$HOME` isolates file paths but **not** `launchd` job
+   identity: `launchctl load`/`unload` resolve jobs by `Label` within
+   the whole `gui/<uid>` domain, not by the plist's file path. If you're
+   testing `install.sh`/`uninstall.sh` interactively (not through
+   `tests/run.sh`, which already handles this via
+   `CLAUDE_BACKUP_PLIST_LABEL`) on a machine that also has the real
+   thing installed, pass a distinct label or you'll silently take the
+   real job down:
+   ```bash
+   HOME="$FAKE_HOME" CLAUDE_BACKUP_PLIST_LABEL="com.test.my-test" ./install.sh
+   ```
    Run scripts under `/bin/bash` explicitly at least once, not just
    whatever `bash` resolves to in your shell — macOS ships bash 3.2 by
    default (Apple hasn't updated it since bash went GPLv3), which has
